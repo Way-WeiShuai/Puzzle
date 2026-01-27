@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>拼图大师 - v3.5 智能加载版</title>
+    <title>拼图大师 - 适配修复版</title>
     <style>
         :root {
             --primary-color: #4a90e2;
@@ -11,32 +11,38 @@
             --card-bg: rgba(255, 255, 255, 0.05);
         }
 
-        /* 优化：允许页面根据内容滚动 */
         body {
             font-family: 'PingFang SC', sans-serif;
             background-color: var(--bg-dark); color: white; margin: 0; 
             min-height: 100vh; display: flex; flex-direction: column; align-items: center;
         }
 
-        /* 菜单界面：支持上下滑动 */
-        #menu-screen {
-            display: none; width: 100%; max-width: 1000px; padding: 20px;
-            box-sizing: border-box; overflow-y: auto; /* 允许滚动 */
+        /* 修复1：确保菜单标题居中并置顶 */
+        .menu-header {
+            width: 100%;
+            padding: 30px 0 10px 0;
+            text-align: center;
+            background: var(--bg-dark);
+            position: sticky; top: 0; z-index: 100;
         }
 
-        /* 游戏界面：保持固定，防止误操作 */
+        #menu-screen {
+            display: none; width: 100%; max-width: 1000px; padding: 0 20px 40px 20px;
+            box-sizing: border-box; overflow-y: auto;
+        }
+
         #game-screen {
             display: none; width: 100%; height: 100vh; overflow: hidden;
             flex-direction: column; align-items: center; justify-content: center;
-            touch-action: none; /* 游戏时禁止浏览器手势 */
+            touch-action: none;
         }
 
-        .active { display: flex !important; }
+        .active { display: flex !important; flex-direction: column; }
 
         #level-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 20px; width: 100%; padding-bottom: 50px;
+            gap: 20px; width: 100%;
         }
 
         .level-card {
@@ -44,109 +50,104 @@
             cursor: pointer; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1);
         }
         .level-card:hover { transform: translateY(-5px); border-color: var(--primary-color); }
+        
         .card-thumb { 
             width: 100%; aspect-ratio: 1; display: flex; align-items: center; 
             justify-content: center; background: #1a1a2e; overflow: hidden;
+            font-size: 2rem;
         }
         .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
-        #board-container { 
-            padding: 10px; background: #1a1a2e; border-radius: 8px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8); position: relative;
+        /* 预览层样式 */
+        #preview-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 2000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(10px);
         }
+        #preview-img { max-width: 90%; max-height: 70%; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+
+        .btn { padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer; background: #333; color: white; font-weight: bold; }
+        .btn-primary { background: var(--primary-color); }
 
         #puzzle-board { display: grid; gap: 0; position: relative; background: #000; }
         .piece { box-sizing: border-box; background-repeat: no-repeat; border: 1px solid rgba(255, 255, 255, 0.2); }
-        
-        /* 无缝融合样式 */
-        .no-border-right { border-right-color: transparent !important; }
-        .no-border-bottom { border-bottom-color: transparent !important; }
-        .no-border-left { border-left-color: transparent !important; }
-        .no-border-top { border-top-color: transparent !important; }
-
-        .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: #333; color: white; font-weight: bold; }
-        
-        #next-level-toast {
-            position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
-            background: var(--primary-color); color: white; padding: 10px 30px;
-            border-radius: 20px; z-index: 2001; display: none;
-        }
     </style>
 </head>
 <body>
 
-    <div id="next-level-toast">即将进入下一关</div>
+    <div id="preview-overlay">
+        <h2 id="preview-title" style="margin-bottom: 20px;">关卡详情</h2>
+        <img id="preview-img" src="">
+        <div style="display: flex; gap: 15px; margin-top: 30px;">
+            <button class="btn" onclick="closePreview()">返回列表</button>
+            <button class="btn btn-primary" id="replay-btn">再次挑战</button>
+        </div>
+    </div>
 
     <div id="menu-screen" class="screen active">
-        <h1 style="text-align: center;">🧩 拼图大师</h1>
+        <div class="menu-header">
+            <h1 style="margin: 0; letter-spacing: 2px;">🧩 拼图大师</h1>
+            <p id="loading-hint" style="color: gray; font-size: 0.9rem; margin-top: 5px;">加载中...</p>
+        </div>
         <div id="level-grid"></div>
     </div>
 
     <div id="game-screen" class="screen">
-        <div style="width:90%; max-width:600px; display:flex; justify-content:space-between; margin-bottom:15px;">
+        <div style="width:90%; max-width:600px; display:flex; justify-content:space-between; margin-bottom:15px; align-items: center;">
             <button class="btn" onclick="showMenu()">← 菜单</button>
             <h3 id="game-title" style="margin:0;">LEVEL</h3>
-            <div id="diff-label" style="opacity: 0.6;">加载中</div>
+            <div id="diff-label" style="opacity: 0.6; font-size: 0.8rem;"></div>
         </div>
-        <div id="board-container">
-            <div id="puzzle-board"></div>
-        </div>
+        <div id="puzzle-board"></div>
     </div>
 
     <script>
         const FORMATS = ['.jpg', '.png', '.webp', '.jpeg'];
-        let cachedExt = null; // 记录成功的后缀，减少 404
+        let cachedExt = null;
         let levelData = [];
         let completedLevels = JSON.parse(localStorage.getItem('puz_comp_v31') || '[]');
         let currentLevelId, rows, cols, pWidth, pHeight, pieces = [];
 
-        // 1. 智能发现逻辑：仅加载 已完成 + 3个未完成
         async function discoverLevels() {
-            const maxCompleted = completedLevels.length > 0 ? Math.max(...completedLevels) : 0;
-            const targetCount = maxCompleted + 3; // 保持有3个未通关的可见
+            // 逻辑：已完成关卡 + 3个预加载关卡
+            const maxIdx = completedLevels.length > 0 ? Math.max(...completedLevels) : 0;
+            const targetCount = maxIdx + 3;
             
-            // 清理旧数据重新扫描，确保顺序
-            const newLevelData = [];
+            const newList = [];
             for (let i = 1; i <= targetCount; i++) {
-                const foundUrl = await findImageEfficiently(i);
-                if (foundUrl) {
-                    newLevelData.push({ id: i, url: foundUrl });
-                } else {
-                    break; // 如果中间断档了，停止搜索
-                }
+                const url = await findImage(i);
+                if (url) newList.push({ id: i, url });
+                else break;
             }
-            levelData = newLevelData;
+            levelData = newList;
+            document.getElementById('loading-hint').innerText = `已发现 ${levelData.length} 个关卡`;
             renderMenu();
         }
 
-        // 2. 修复 404 的核心函数：优先尝试已成功的后缀
-        async function findImageEfficiently(id) {
-            // 如果已经知道后缀（比如 .jpg），先尝试它，避免产生其他格式的 404
+        async function findImage(id) {
             if (cachedExt) {
                 const url = `${id}${cachedExt}`;
-                if (await probeImage(url)) return url;
+                if (await check(url)) return url;
             }
-            // 如果没有缓存或缓存失效，才轮询
             for (const ext of FORMATS) {
                 if (ext === cachedExt) continue;
                 const url = `${id}${ext}`;
-                if (await probeImage(url)) {
-                    cachedExt = ext; // 记忆成功后缀
-                    return url;
-                }
+                if (await check(url)) { cachedExt = ext; return url; }
             }
             return null;
         }
 
-        function probeImage(url) {
-            return new Promise(resolve => {
-                const img = new Image();
-                img.onload = () => resolve(true);
-                img.onerror = () => resolve(false);
-                img.src = url;
+        function check(url) {
+            return new Promise(r => {
+                const i = new Image();
+                i.onload = () => r(true);
+                i.onerror = () => r(false);
+                i.src = url;
             });
         }
 
+        // 修复2：已完成关卡点击弹出预览，未完成进入游戏
         function renderMenu() {
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
@@ -154,15 +155,33 @@
                 const isDone = completedLevels.includes(level.id);
                 const card = document.createElement('div');
                 card.className = 'level-card';
-                // 仅显示已完成或“当前可挑战”的图片预览
-                const showImg = isDone || level.id === (completedLevels.length > 0 ? Math.max(...completedLevels)+1 : 1);
+                
+                // 只有已完成或“当前关”才显示缩略图
+                const canSee = isDone || level.id === (completedLevels.length > 0 ? Math.max(...completedLevels)+1 : 1);
+                
                 card.innerHTML = `
-                    <div class="card-thumb">${showImg ? `<img src="${level.url}">` : '🔒'}</div>
-                    <div style="padding:10px; text-align:center;">第 ${level.id} 关</div>
+                    <div class="card-thumb">${canSee ? `<img src="${level.url}">` : '🔒'}</div>
+                    <div style="padding:10px; text-align:center; font-weight:bold;">第 ${level.id} 关</div>
                 `;
-                card.onclick = () => startLevel(level.id);
+                
+                // 点击逻辑：已完成则预览，未完成则开玩
+                card.onclick = () => isDone ? showPreview(level) : startLevel(level.id);
                 grid.appendChild(card);
             });
+        }
+
+        function showPreview(level) {
+            document.getElementById('preview-img').src = level.url;
+            document.getElementById('preview-title').innerText = `第 ${level.id} 关 · 已通关`;
+            document.getElementById('replay-btn').onclick = () => {
+                closePreview();
+                startLevel(level.id);
+            };
+            document.getElementById('preview-overlay').style.display = 'flex';
+        }
+
+        function closePreview() {
+            document.getElementById('preview-overlay').style.display = 'none';
         }
 
         function startLevel(id) {
@@ -186,10 +205,11 @@
                     pHeight = Math.floor(maxH / rows);
                     pWidth = Math.floor(pHeight * ratio);
                 }
+                
                 initBoard(level.url);
                 document.getElementById('menu-screen').classList.remove('active');
                 document.getElementById('game-screen').classList.add('active');
-                document.getElementById('game-title').innerText = `LEVEL ${id}`;
+                document.getElementById('game-title').innerText = `第 ${id} 关`;
                 document.getElementById('diff-label').innerText = `${cols}x${rows}`;
             };
         }
@@ -211,10 +231,7 @@
             board.style.height = `${pHeight * rows}px`;
             board.style.gridTemplateColumns = `repeat(${cols}, ${pWidth}px)`;
 
-            const gridMap = {};
-            pieces.forEach(p => gridMap[p.currentPos] = p);
-            
-            [...pieces].sort((a,b) => a.currentPos - b.currentPos).forEach(p => {
+            pieces.sort((a,b) => a.currentPos - b.currentPos).forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'piece';
                 div.dataset.id = p.id;
@@ -223,82 +240,41 @@
                 div.style.backgroundImage = `url(${p.url})`;
                 div.style.backgroundPosition = `-${p.bgX}px -${p.bgY}px`;
                 div.style.backgroundSize = `${pWidth * cols}px ${pHeight * rows}px`;
-
-                // 融合逻辑
-                const pos = p.currentPos, r = Math.floor(pos / cols), c = pos % cols;
-                if (c < cols - 1 && gridMap[pos+1]?.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(gridMap[pos+1].id/cols)) div.classList.add('no-border-right');
-                if (c > 0 && gridMap[pos-1]?.id === p.id-1 && Math.floor(p.id/cols) === Math.floor(gridMap[pos-1].id/cols)) div.classList.add('no-border-left');
-                if (r < rows - 1 && gridMap[pos+cols]?.id === p.id+cols) div.classList.add('no-border-bottom');
-                if (r > 0 && gridMap[pos-cols]?.id === p.id-cols) div.classList.add('no-border-top');
-
                 div.onpointerdown = e => handleDrag(e, p.id);
                 board.appendChild(div);
             });
         }
 
+        // 简易拖拽逻辑 (复用之前版本)
         function handleDrag(e, id) {
             const startX = e.clientX, startY = e.clientY;
-            const group = getConnectedGroup(id);
-            group.forEach(gid => document.querySelector(`[data-id="${gid}"]`).style.zIndex = "100");
+            const piece = pieces.find(p => p.id === id);
+            const el = document.querySelector(`[data-id="${id}"]`);
+            el.style.zIndex = "100";
 
             window.onpointermove = (ev) => {
-                const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                group.forEach(gid => {
-                    document.querySelector(`[data-id="${gid}"]`).style.transform = `translate(${dx}px, ${dy}px)`;
-                });
+                el.style.transform = `translate(${ev.clientX - startX}px, ${ev.clientY - startY}px)`;
             };
 
             window.onpointerup = (ev) => {
                 window.onpointermove = null; window.onpointerup = null;
                 const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                const dCols = Math.round(dx / pWidth), dRows = Math.round(dy / pHeight);
-
-                if (dCols !== 0 || dRows !== 0) {
-                    let canMove = true;
-                    const plan = [];
-                    group.forEach(gid => {
-                        const p = pieces.find(x => x.id === gid);
-                        const nr = Math.floor(p.currentPos / cols) + dRows, nc = (p.currentPos % cols) + dCols;
-                        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) canMove = false;
-                        plan.push({ p, to: nr * cols + nc });
-                    });
-
-                    if (canMove) {
-                        const targets = plan.map(m => m.to);
-                        const victims = pieces.filter(x => targets.includes(x.currentPos) && !group.includes(x.id));
-                        const vacant = plan.map(m => m.p.currentPos).filter(v => !targets.includes(v));
-                        plan.forEach(m => m.p.currentPos = m.to);
-                        victims.forEach((v, i) => v.currentPos = vacant[i]);
+                const dc = Math.round(dx / pWidth), dr = Math.round(dy / pHeight);
+                
+                if (dc !== 0 || dr !== 0) {
+                    const nr = Math.floor(piece.currentPos / cols) + dr;
+                    const nc = (piece.currentPos % cols) + dc;
+                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                        const targetPos = nr * cols + nc;
+                        const other = pieces.find(p => p.currentPos === targetPos);
+                        other.currentPos = piece.currentPos;
+                        piece.currentPos = targetPos;
                     }
                 }
-                group.forEach(gid => {
-                    const el = document.querySelector(`[data-id="${gid}"]`);
-                    el.style.zIndex = "1"; el.style.transform = "";
-                });
+                el.style.zIndex = "1"; el.style.transform = "";
                 renderPieces();
                 checkWin();
             };
-        }
-
-        function getConnectedGroup(startId) {
-            const group = new Set([startId]), queue = [startId];
-            while (queue.length > 0) {
-                const id = queue.shift(), p = pieces.find(x => x.id === id);
-                const r = Math.floor(p.currentPos / cols), c = p.currentPos % cols;
-                const adjs = [
-                    {dr:0,dc:1,cond:n=>n.id===p.id+1&&Math.floor(p.id/cols)===Math.floor(n.id/cols)},
-                    {dr:0,dc:-1,cond:n=>n.id===p.id-1&&Math.floor(p.id/cols)===Math.floor(n.id/cols)},
-                    {dr:1,dc:0,cond:n=>n.id===p.id+cols}, {dr:-1,dc:0,cond:n=>n.id===p.id-cols}
-                ];
-                adjs.forEach(a => {
-                    const nr = r+a.dr, nc = c+a.dc;
-                    if (nr>=0 && nr<rows && nc>=0 && nc<cols) {
-                        const target = pieces.find(x => x.currentPos === nr*cols+nc);
-                        if (target && !group.has(target.id) && a.cond(target)) { group.add(target.id); queue.push(target.id); }
-                    }
-                });
-            }
-            return Array.from(group);
         }
 
         function checkWin() {
@@ -308,17 +284,11 @@
                     localStorage.setItem('puz_comp_v31', JSON.stringify(completedLevels));
                 }
                 setTimeout(() => {
-                    showToast(`完成！解锁下一关`);
-                    discoverLevels(); // 过关后立即更新菜单和加载新关卡资源
-                    startLevel(currentLevelId + 1);
+                    alert("恭喜通关！");
+                    discoverLevels();
+                    showMenu();
                 }, 500);
             }
-        }
-
-        function showToast(text) {
-            const t = document.getElementById('next-level-toast');
-            t.innerText = text; t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 2000);
         }
 
         function showMenu() {
