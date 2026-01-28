@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拼图大师 - v3.3 稳定版</title>
+    <title>拼图大师 - v3.4 优化版</title>
     <style>
         :root {
             --primary-color: #4a90e2;
@@ -41,21 +41,22 @@
             background: #1a1a2e; font-size: 2.5rem; color: #222; font-weight: bold; }
         .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* 棋盘容器：优化动画时长为 0.8s */
+        /* --- 优化 1：通关动画时长延长至 1.5s --- */
         #board-container { 
             padding: 10px;
             background: #1a1a2e; border-radius: 8px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
-            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
-                        opacity 0.8s ease-out, 
-                        box-shadow 0.8s;
+            /* 设定为 1.5s 动画 */
+            transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                        opacity 1.5s ease-in-out, 
+                        box-shadow 1.5s;
             z-index: 10;
             position: relative;
         }
 
-        /* 通关瞬间：放大并消失 */
+        /* 触发通关特效：放大并完全消失 */
         .victory-zoom { 
-            transform: scale(1.3);
+            transform: scale(1.5);
             opacity: 0;
             box-shadow: 0 0 50px rgba(74, 144, 226, 0.8);
             z-index: 100;
@@ -68,9 +69,8 @@
             opacity: 0;
             z-index: 50;
             pointer-events: none;
-            transition: opacity 0.2s ease-out;
+            transition: opacity 0.3s ease-out;
         }
-        
         .victory-zoom #victory-overlay { opacity: 1; }
 
         #puzzle-board { 
@@ -88,6 +88,10 @@
         .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: #333; color: white; font-weight: bold; }
         .btn:hover { background: var(--primary-color); }
 
+        /* 重置按钮样式 */
+        .reset-btn { font-size: 0.7rem; padding: 4px 10px; background: rgba(255,255,255,0.1); margin-left: 15px; vertical-align: middle; border: 1px solid rgba(255,255,255,0.2); }
+        .reset-btn:hover { background: #e74c3c; border-color: #e74c3c; }
+
         #next-level-toast {
             position: fixed;
             top: 20%; left: 50%; transform: translateX(-50%);
@@ -100,7 +104,7 @@
 </head>
 <body>
 
-    <div id="next-level-toast">即将进入下一关</div>
+    <div id="next-level-toast">LEVEL N 准备就绪</div>
 
     <div id="preview-overlay">
         <h2 id="preview-title">关卡预览</h2>
@@ -112,7 +116,10 @@
     </div>
 
     <div id="menu-screen" class="screen active">
-        <h1 style="letter-spacing: 4px;">🧩 拼图大师 v3.3</h1>
+        <h1 style="letter-spacing: 4px; display: flex; align-items: center;">
+            🧩 拼图大师 v3.4 
+            <button class="btn reset-btn" onclick="resetGame()">重置进度</button>
+        </h1>
         <p id="loading-hint" style="color:var(--primary-color)">正在扫描本地图片库...</p>
         <div id="level-grid"></div>
     </div>
@@ -133,6 +140,7 @@
     <script>
         const FORMATS = ['.jpg', '.png', '.webp', '.jpeg']; 
         let levelData = [];
+        // 
         let completedLevels = JSON.parse(localStorage.getItem('puz_comp_v31') || '[]');
         let currentImgUrl = '', currentLevelId = 1, rows, cols, pWidth, pHeight;
         let pieces = [], isMoving = false, isVictoryProcessing = false;
@@ -171,14 +179,14 @@
             });
         }
 
-        // 核心修复：阶梯式解锁逻辑
+        // 严格阶梯解锁逻辑：已完成显示图，未完成但解锁显示数字，未解锁显示锁
         function renderMenu() {
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
             
             levelData.forEach((level) => {
                 const isDone = completedLevels.includes(level.id);
-                // 解锁条件：第1关，或者前一关已通关
+                // [cite: 58] 逻辑：第一关或者前一关已完成则解锁
                 const isUnlocked = level.id === 1 || completedLevels.includes(level.id - 1);
                 
                 const card = document.createElement('div');
@@ -209,6 +217,16 @@
             });
         }
 
+        // --- 优化 2：重置逻辑 ---
+        function resetGame() {
+            if (confirm("确定要清除所有通关记录并重新开始吗？")) {
+                localStorage.removeItem('puz_comp_v31');
+                completedLevels = [];
+                renderMenu();
+                alert("进度已重置。");
+            }
+        }
+
         function startLevel(levelId) {
             isVictoryProcessing = false;
             currentLevelId = levelId;
@@ -221,7 +239,6 @@
             img.src = currentImgUrl;
             img.onload = () => {
                 const ratio = img.naturalWidth / img.naturalHeight;
-                // 动态难度阶梯
                 const difficultyStep = Math.floor((levelId - 1) / 3);
                 let baseDim = 3 + difficultyStep;
 
@@ -333,7 +350,7 @@
             };
         }
 
-        // 通关跳转优化逻辑
+        // --- 优化 1：通关动画及提示顺序 ---
         function checkWin() {
             if (pieces.every(p => p.id === p.currentPos)) {
                 isVictoryProcessing = true;
@@ -342,21 +359,25 @@
                     localStorage.setItem('puz_comp_v31', JSON.stringify(completedLevels));
                 }
 
+                // 启动 1.5s 的放大并淡出动画
                 const container = document.getElementById('board-container');
                 container.classList.add('victory-zoom');
 
+                // 只有在 1.5s 动画完成（图片消失）后，才显示提示和进入下一关
                 setTimeout(() => {
                     const nextId = currentLevelId + 1;
                     const nextLevelExists = levelData.some(l => l.id === nextId);
                     
                     if (nextLevelExists) {
+                        // 文本提示在此刻出现
                         showToast(`LEVEL ${nextId} 准备就绪`);
+                        // 短暂延迟后正式加载下一关，确保视觉衔接
                         setTimeout(() => startLevel(nextId), 400);
                     } else {
                         alert("太厉害了！你已通关所有本地关卡！");
                         showMenu();
                     }
-                }, 800); 
+                }, 1500); // 与 CSS 的 1.5s 匹配
             }
         }
 
