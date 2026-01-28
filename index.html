@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图大师 - v3.7 移动端优化版</title>
+    <title>拼图大师 - v3.8 动态难度平衡版</title>
     <style>
         :root {
             --primary-color: #4a90e2;
@@ -16,16 +16,13 @@
             font-family: 'PingFang SC', sans-serif;
             background-color: var(--bg-dark); color: white; margin: 0; 
             min-height: 100vh; display: flex; flex-direction: column; align-items: center; 
-            /* 允许主菜单滚动，但在游戏内会通过 JS 动态锁定 */
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
+            overflow-x: hidden; -webkit-overflow-scrolling: touch;
         }
 
         .screen { display: none; width: 100%; max-width: 1000px; padding: 20px; animation: fadeIn 0.3s; box-sizing: border-box; }
         .active { display: flex; flex-direction: column; align-items: center; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* 预览层 */
         #preview-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 2000;
@@ -34,22 +31,17 @@
         }
         #preview-img { max-width: 90%; max-height: 75%; border-radius: 4px; border: 1px solid #555; }
 
-        /* 主菜单网格 */
         #level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; width: 100%; margin-top: 20px; padding-bottom: 50px; }
         .level-card { background: var(--card-bg); border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1); }
         .level-card:hover { transform: translateY(-5px); border-color: var(--primary-color); }
         .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a2e; font-size: 2.5rem; font-weight: bold; }
         .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 核心修复点 1：游戏容器禁用所有系统默认手势，防止滚动冲突 */
         #board-container { 
             padding: 10px; background: #1a1a2e; border-radius: 8px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
             transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 1.5s ease-in-out;
-            z-index: 10; position: relative;
-            touch-action: none; /* 关键：禁止此区域的页面缩放和滚动 */
-            user-select: none;
-            -webkit-user-select: none;
+            z-index: 10; position: relative; touch-action: none; user-select: none; -webkit-user-select: none;
         }
 
         .piece { box-sizing: border-box; background-repeat: no-repeat; cursor: grab; border: 1px solid rgba(255, 255, 255, 0.2); touch-action: none; }
@@ -88,7 +80,7 @@
     </div>
 
     <div id="menu-screen" class="screen active">
-        <h1 style="letter-spacing: 4px;">🧩 拼图大师 v3.7 <button class="btn reset-btn" onclick="resetGame()">重置进度</button></h1>
+        <h1 style="letter-spacing: 4px;">🧩 拼图大师 v3.8 <button class="btn reset-btn" onclick="resetGame()">重置进度</button></h1>
         <p id="loading-hint" style="color:var(--primary-color)">正在同步资源...</p>
         <div id="level-grid"></div>
     </div>
@@ -121,10 +113,8 @@
             while (searching && count < targetLimit) {
                 const nextId = count + 1;
                 const foundUrl = await findImageForLevel(nextId);
-                if (foundUrl) {
-                    levelData.push({ id: nextId, url: foundUrl });
-                    count++;
-                } else { searching = false; }
+                if (foundUrl) { levelData.push({ id: nextId, url: foundUrl }); count++; } 
+                else { searching = false; }
             }
             document.getElementById('loading-hint').style.display = 'none';
             renderMenu();
@@ -148,7 +138,7 @@
         }
 
         function renderMenu() {
-            document.body.style.overflowY = 'auto'; // 菜单页允许滚动
+            document.body.style.overflowY = 'auto';
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
             levelData.forEach(level => {
@@ -166,25 +156,60 @@
             });
         }
 
+        // --- 核心优化：动态难度平衡算法 ---
+        function calculateDifficulty(levelId, ratio) {
+            let r, c;
+
+            if (levelId <= 15) {
+                // 阶段 1：传统演进 (Level 1-15)
+                // 1-3关:3x4, 4-6关:4x5, 7-9关:5x6, 10-12关:6x7, 13-15关:7x8
+                let baseDim = 3 + Math.floor((levelId - 1) / 3);
+                if (ratio > 1.2) { c = baseDim + 1; r = baseDim; }
+                else if (ratio < 0.8) { c = baseDim; r = baseDim + 1; }
+                else { c = baseDim; r = baseDim; }
+            } 
+            else if (levelId <= 50) {
+                // 阶段 2：平稳随机期 (Level 16-50)
+                // 难度池：7x7, 7x8, 8x7, 8x8, 8x9, 9x8, 9x9
+                const pool = [[7,7], [7,8], [8,7], [8,8], [8,9], [9,8], [9,9]];
+                const choice = pool[Math.floor(Math.random() * pool.length)];
+                // 根据图片比例智能分配行列，防止拼图块过扁
+                if (ratio > 1 && choice[0] > choice[1]) { r = choice[1]; c = choice[0]; }
+                else if (ratio < 1 && choice[1] > choice[0]) { r = choice[0]; c = choice[1]; }
+                else { r = choice[0]; c = choice[1]; }
+            } 
+            else {
+                // 阶段 3：大师随机期 (Level 51+)
+                // 增加 9x10, 10x9, 10x10
+                const pool = [[7,7], [7,8], [8,7], [8,8], [8,9], [9,8], [9,9], [9,10], [10,9], [10,10]];
+                const choice = pool[Math.floor(Math.random() * pool.length)];
+                if (ratio > 1 && choice[0] > choice[1]) { r = choice[1]; c = choice[0]; }
+                else if (ratio < 1 && choice[1] > choice[0]) { r = choice[0]; c = choice[1]; }
+                else { r = choice[0]; c = choice[1]; }
+            }
+
+            return { r, c };
+        }
+
         function startLevel(levelId) {
             isVictoryProcessing = false;
             currentLevelId = levelId;
             const levelInfo = levelData.find(l => l.id === levelId);
             if (!levelInfo) return showMenu();
 
-            // 核心修复点 2：进入关卡时锁定页面滚动，防止误触
             document.body.style.overflow = 'hidden';
-
             currentImgUrl = levelInfo.url;
             document.getElementById('victory-overlay').src = currentImgUrl;
+            
             const img = new Image();
             img.src = currentImgUrl;
             img.onload = () => {
                 const ratio = img.naturalWidth / img.naturalHeight;
-                const difficultyStep = Math.floor((levelId - 1) / 3);
-                let baseDim = 3 + difficultyStep;
-                cols = ratio > 1.2 ? baseDim + 1 : baseDim;
-                rows = ratio < 0.8 ? baseDim + 1 : baseDim;
+                
+                // 使用新算法计算行列
+                const diff = calculateDifficulty(levelId, ratio);
+                rows = diff.r;
+                cols = diff.c;
 
                 const maxW = Math.min(window.innerWidth * 0.9, 700);
                 const maxH = window.innerHeight * 0.65;
@@ -202,7 +227,7 @@
                 document.getElementById('menu-screen').classList.remove('active');
                 document.getElementById('game-screen').classList.add('active');
                 document.getElementById('game-title').innerText = `第 ${levelId} 关`;
-                document.getElementById('diff-label').innerText = `难度: ${cols} x ${rows}`;
+                document.getElementById('diff-label').innerText = `难度: ${cols} x ${rows} (${cols * rows}块)`;
             };
         }
 
@@ -248,15 +273,13 @@
 
         function handleDragStart(e, id) {
             if (isVictoryProcessing) return;
-            e.preventDefault(); // 核心修复点 3：阻止默认拖拽行为
+            e.preventDefault();
             const startX = e.clientX, startY = e.clientY;
             const activeGroupId = getConnectedGroup(id);
-            
             activeGroupId.forEach(gid => {
                 const el = document.querySelector(`[data-id="${gid}"]`);
                 if(el) el.style.zIndex = "100";
             });
-
             window.onpointermove = (ev) => {
                 const dx = ev.clientX - startX, dy = ev.clientY - startY;
                 activeGroupId.forEach(gid => {
@@ -264,12 +287,10 @@
                     if(el) el.style.transform = `translate(${dx}px, ${dy}px)`;
                 });
             };
-
             window.onpointerup = (ev) => {
                 window.onpointermove = null; window.onpointerup = null;
                 const dx = ev.clientX - startX, dy = ev.clientY - startY;
                 let dCols = Math.round(dx / pWidth), dRows = Math.round(dy / pHeight);
-
                 if (dCols !== 0 || dRows !== 0) {
                     let illegal = false;
                     const plan = [];
@@ -346,7 +367,6 @@
             document.getElementById('preview-overlay').style.display = 'flex';
             document.getElementById('replay-btn').onclick = () => { closePreview(); startLevel(id); };
         }
-
         function closePreview() { document.getElementById('preview-overlay').style.display = 'none'; }
         function showMenu() { document.getElementById('game-screen').classList.remove('active'); document.getElementById('menu-screen').classList.add('active'); renderMenu(); }
         function resetGame() { if (confirm("重置所有进度？")) { localStorage.clear(); location.reload(); } }
