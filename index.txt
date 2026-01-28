@@ -2,27 +2,30 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拼图大师 - v3.6 完美修复版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拼图大师 - v3.7 移动端优化版</title>
     <style>
         :root {
             --primary-color: #4a90e2;
             --bg-dark: #0f0f1e;
             --card-bg: rgba(255, 255, 255, 0.05);
-            --silver-grey: #bdc3c7; /* 优化 2: 银灰色 */
+            --silver-grey: #bdc3c7;
         }
 
         body {
             font-family: 'PingFang SC', sans-serif;
             background-color: var(--bg-dark); color: white; margin: 0; 
             min-height: 100vh; display: flex; flex-direction: column; align-items: center; 
-            touch-action: pan-y; overflow-y: auto; /* 优化：支持主界面滚动 */
+            /* 允许主菜单滚动，但在游戏内会通过 JS 动态锁定 */
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
         }
 
         .screen { display: none; width: 100%; max-width: 1000px; padding: 20px; animation: fadeIn 0.3s; box-sizing: border-box; }
         .active { display: flex; flex-direction: column; align-items: center; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+        /* 预览层 */
         #preview-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 2000;
@@ -31,31 +34,35 @@
         }
         #preview-img { max-width: 90%; max-height: 75%; border-radius: 4px; border: 1px solid #555; }
 
+        /* 主菜单网格 */
         #level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; width: 100%; margin-top: 20px; padding-bottom: 50px; }
         .level-card { background: var(--card-bg); border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1); }
         .level-card:hover { transform: translateY(-5px); border-color: var(--primary-color); }
         .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a2e; font-size: 2.5rem; font-weight: bold; }
         .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 拼图块边框融合样式 */
-        .piece { box-sizing: border-box; background-repeat: no-repeat; cursor: grab; border: 1px solid rgba(255, 255, 255, 0.2); transition: border-color 0.3s; }
-        .no-border-right { border-right-color: transparent !important; }
-        .no-border-bottom { border-bottom-color: transparent !important; }
-        .no-border-left { border-left-color: transparent !important; }
-        .no-border-top { border-top-color: transparent !important; }
-
+        /* 核心修复点 1：游戏容器禁用所有系统默认手势，防止滚动冲突 */
         #board-container { 
             padding: 10px; background: #1a1a2e; border-radius: 8px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
             transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 1.5s ease-in-out;
             z-index: 10; position: relative;
+            touch-action: none; /* 关键：禁止此区域的页面缩放和滚动 */
+            user-select: none;
+            -webkit-user-select: none;
         }
+
+        .piece { box-sizing: border-box; background-repeat: no-repeat; cursor: grab; border: 1px solid rgba(255, 255, 255, 0.2); touch-action: none; }
+        .no-border-right { border-right-color: transparent !important; }
+        .no-border-bottom { border-bottom-color: transparent !important; }
+        .no-border-left { border-left-color: transparent !important; }
+        .no-border-top { border-top-color: transparent !important; }
+
+        #puzzle-board { display: grid; gap: 0; position: relative; border: 1px solid rgba(255, 255, 255, 0.2); background: #000; }
         .victory-zoom { transform: scale(1.5); opacity: 0; z-index: 100; }
         #victory-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; z-index: 50; pointer-events: none; transition: opacity 0.3s; }
         .victory-zoom #victory-overlay { opacity: 1; }
 
-        #puzzle-board { display: grid; gap: 0; position: relative; border: 1px solid rgba(255, 255, 255, 0.2); background: #000; }
-        
         .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: #333; color: white; font-weight: bold; }
         .btn:hover { background: var(--primary-color); }
         .reset-btn { font-size: 0.7rem; padding: 4px 10px; background: rgba(255,255,255,0.1); margin-left: 15px; }
@@ -81,7 +88,7 @@
     </div>
 
     <div id="menu-screen" class="screen active">
-        <h1 style="letter-spacing: 4px;">🧩 拼图大师 v3.6 <button class="btn reset-btn" onclick="resetGame()">重置进度</button></h1>
+        <h1 style="letter-spacing: 4px;">🧩 拼图大师 v3.7 <button class="btn reset-btn" onclick="resetGame()">重置进度</button></h1>
         <p id="loading-hint" style="color:var(--primary-color)">正在同步资源...</p>
         <div id="level-grid"></div>
     </div>
@@ -90,7 +97,7 @@
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <button class="btn" onclick="showMenu()">← 返回菜单</button>
             <h2 id="game-title" style="margin:0;">LEVEL</h2>
-            <div id="diff-label" style="font-size: 0.8rem; opacity: 0.6;">难度计算中</div>
+            <div id="diff-label" style="font-size: 0.8rem; opacity: 0.6;">计算中</div>
         </div>
         <div id="board-container">
             <div id="puzzle-board">
@@ -106,7 +113,6 @@
         let currentImgUrl = '', currentLevelId = 1, rows, cols, pWidth, pHeight;
         let pieces = [], isVictoryProcessing = false;
 
-        // --- 核心优化 1: 懒加载扫描逻辑 ---
         async function discoverLevels() {
             const currentMax = completedLevels.length > 0 ? Math.max(...completedLevels) : 0;
             const targetLimit = currentMax + 5; 
@@ -141,35 +147,19 @@
             });
         }
 
-        // --- 修复 1 & 2: 状态文本与数字颜色 ---
         function renderMenu() {
+            document.body.style.overflowY = 'auto'; // 菜单页允许滚动
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
             levelData.forEach(level => {
                 const isDone = completedLevels.includes(level.id);
                 const isUnlocked = level.id === 1 || completedLevels.includes(level.id - 1);
-                
                 const card = document.createElement('div');
                 card.className = 'level-card';
-                
-                let content = '';
-                let statusText = '';
-                
-                if (isDone) {
-                    content = `<img src="${level.url}">`;
-                    statusText = '已完成';
-                } else if (isUnlocked) {
-                    // 修复 2: 银灰色数字
-                    content = `<span style="color:var(--silver-grey)">${level.id}</span>`;
-                    statusText = '挑战中';
-                } else {
-                    // 修复 1: 未解锁逻辑
-                    content = `<span style="opacity:0.2">🔒</span>`;
-                    statusText = '未解锁';
-                    card.style.opacity = '0.5';
-                    card.style.pointerEvents = 'none';
-                }
-
+                let content = '', statusText = '';
+                if (isDone) { content = `<img src="${level.url}">`; statusText = '已完成'; }
+                else if (isUnlocked) { content = `<span style="color:var(--silver-grey)">${level.id}</span>`; statusText = '挑战中'; }
+                else { content = `<span style="opacity:0.2">🔒</span>`; statusText = '未解锁'; card.style.opacity = '0.5'; card.style.pointerEvents = 'none'; }
                 card.innerHTML = `<div class="card-thumb">${content}</div><div style="padding:8px;text-align:center;font-size:0.8rem;">${statusText}</div>`;
                 card.onclick = () => isDone ? showPreview(level.id) : startLevel(level.id);
                 grid.appendChild(card);
@@ -181,6 +171,9 @@
             currentLevelId = levelId;
             const levelInfo = levelData.find(l => l.id === levelId);
             if (!levelInfo) return showMenu();
+
+            // 核心修复点 2：进入关卡时锁定页面滚动，防止误触
+            document.body.style.overflow = 'hidden';
 
             currentImgUrl = levelInfo.url;
             document.getElementById('victory-overlay').src = currentImgUrl;
@@ -206,7 +199,6 @@
                 const container = document.getElementById('board-container');
                 container.classList.remove('victory-zoom');
                 container.style.opacity = '1';
-                
                 document.getElementById('menu-screen').classList.remove('active');
                 document.getElementById('game-screen').classList.add('active');
                 document.getElementById('game-title').innerText = `第 ${levelId} 关`;
@@ -224,7 +216,6 @@
             renderPieces();
         }
 
-        // --- 修复 4: 恢复图片融合显示逻辑 ---
         function renderPieces() {
             const board = document.getElementById('puzzle-board');
             const overlay = document.getElementById('victory-overlay');
@@ -244,7 +235,6 @@
                 div.style.backgroundPosition = `-${p.bgX}px -${p.bgY}px`;
                 div.style.backgroundSize = `${pWidth * cols}px ${pHeight * rows}px`;
 
-                // 融合边框逻辑
                 const pos = p.currentPos, r = Math.floor(pos / cols), c = pos % cols;
                 if (c < cols - 1 && gridMap[pos+1]?.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(gridMap[pos+1].id/cols)) div.classList.add('no-border-right');
                 if (c > 0 && gridMap[pos-1]?.id === p.id-1 && Math.floor(p.id/cols) === Math.floor(gridMap[pos-1].id/cols)) div.classList.add('no-border-left');
@@ -256,13 +246,12 @@
             });
         }
 
-        // --- 修复 3 & 4: 恢复融合跟随移动逻辑 ---
         function handleDragStart(e, id) {
             if (isVictoryProcessing) return;
+            e.preventDefault(); // 核心修复点 3：阻止默认拖拽行为
             const startX = e.clientX, startY = e.clientY;
             const activeGroupId = getConnectedGroup(id);
             
-            // 提升组内所有碎片的层级
             activeGroupId.forEach(gid => {
                 const el = document.querySelector(`[data-id="${gid}"]`);
                 if(el) el.style.zIndex = "100";
@@ -307,7 +296,6 @@
             };
         }
 
-        // 核心算法：获取相邻且顺序正确的碎片组
         function getConnectedGroup(startId) {
             const group = new Set([startId]), queue = [startId];
             while (queue.length > 0) {
@@ -352,15 +340,11 @@
             setTimeout(() => toast.style.display = 'none', 1500);
         }
 
-        // --- 修复 5: 再次挑战逻辑 ---
         function showPreview(id) {
             const level = levelData.find(l => l.id === id);
             document.getElementById('preview-img').src = level.url;
             document.getElementById('preview-overlay').style.display = 'flex';
-            document.getElementById('replay-btn').onclick = () => { 
-                closePreview(); 
-                startLevel(id); 
-            };
+            document.getElementById('replay-btn').onclick = () => { closePreview(); startLevel(id); };
         }
 
         function closePreview() { document.getElementById('preview-overlay').style.display = 'none'; }
