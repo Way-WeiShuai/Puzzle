@@ -141,7 +141,7 @@
         // --- 请替换为您在 Supabase 项目中获取的真实信息 ---
         const SUPABASE_URL = 'https://afdnvaysvwdmbnxklogt.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const FORMATS = ['.jpg', '.png', '.webp', '.jpeg'];
         let levelData = [], completedLevels = JSON.parse(localStorage.getItem('puz_comp_v31') || '[]');
