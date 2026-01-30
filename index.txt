@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图大师 - v4.5 Supabase 增强版</title>
+    <title>拼图大师 - v4.5 稳定版</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -73,9 +73,9 @@
         .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a2e; font-size: 2rem; position: relative; }
         .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
         
-        #board-container { padding: 10px; background: #1a1a2e; border-radius: 8px; position: relative; transition: transform 1.2s ease-in-out; }
+        #board-container { padding: 10px; background: #1a1a2e; border-radius: 8px; position: relative; transition: transform 0.8s ease-in-out; }
         #puzzle-board { display: grid; gap: 0; position: relative; border: 1px solid rgba(255, 255, 255, 0.2); background: #000; overflow: hidden;}
-        .piece { box-sizing: border-box; background-repeat: no-repeat; border: 0.5px solid rgba(255, 255, 255, 0.15); touch-action: none; transition: transform 0.1s; }
+        .piece { box-sizing: border-box; background-repeat: no-repeat; border: 0.5px solid rgba(255, 255, 255, 0.15); touch-action: none; transition: transform 0.05s; }
         
         /* 拼合后的无缝效果 */
         .no-border-right { border-right-color: transparent !important; }
@@ -86,8 +86,7 @@
         .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: #333; color: white; font-weight: bold; }
         #rank-btn { background: rgba(241, 196, 15, 0.15); color: var(--gold); border: 1px solid var(--gold); }
         
-        /* 胜利缩放 */
-        .victory-zoom { transform: scale(1.2); z-index: 100; }
+        .victory-zoom { transform: scale(1.1); z-index: 100; }
         #victory-img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 0.5s; pointer-events: none; z-index: 50; }
     </style>
 </head>
@@ -146,18 +145,21 @@
     </div>
 
     <script>
-        // --- 1. Supabase 配置 ---
+        // --- 1. Supabase 初始化 ---
         const SB_URL = 'https://afdnvaysvwdmbnxklogt.supabase.co';
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE';
         
         let _db = null;
         try {
-            _db = supabase.createClient(SB_URL, SB_KEY);
-        } catch(e) { console.error("SDK Error"); }
+            if (typeof supabase !== 'undefined') {
+                _db = supabase.createClient(SB_URL, SB_KEY);
+            }
+        } catch(e) { console.error("Supabase Init Failed", e); }
 
         // --- 2. 核心状态 ---
         const FORMATS = ['.jpg', '.png', '.webp'];
-        let levelData = [], completedLevels = JSON.parse(localStorage.getItem('puz_save_v45') || '[]');
+        let levelData = [];
+        let completedLevels = JSON.parse(localStorage.getItem('puz_save_v45') || '[]');
         let currentLevelId = 1, currentImgUrl = '', rows, cols, pW, pH, pieces = [], isVictory = false;
 
         // --- 3. 数据服务 ---
@@ -165,12 +167,17 @@
             async syncProgress(nick, level) {
                 if(!_db) return;
                 const uid = localStorage.getItem('puz_uid_v45');
-                await _db.from('rankings').upsert({ id: uid, nickname: nick, max_level: level });
+                if(!uid) return;
+                try {
+                    await _db.from('rankings').upsert({ id: uid, nickname: nick, max_level: level });
+                } catch(e) { console.error("Sync Error", e); }
             },
             async fetchRanks() {
                 if(!_db) return [];
-                const { data } = await _db.from('rankings').select('*').order('max_level', {ascending: false}).limit(50);
-                return data || [];
+                try {
+                    const { data } = await _db.from('rankings').select('*').order('max_level', {ascending: false}).limit(50);
+                    return data || [];
+                } catch(e) { return []; }
             }
         };
 
@@ -203,20 +210,30 @@
             document.getElementById('user-stat').innerText = `进度: Lv.${completedLevels.length}`;
         }
 
-        // --- 5. 菜单逻辑 ---
+        // --- 5. 菜单逻辑 (问题1修复：加载进度+5) ---
         async function discoverLevels() {
-            // 预加载 15 关，如果没有图则停止
+            const currentMax = completedLevels.length;
+            const targetLoad = currentMax + 5; // 始终探测到当前等级+5
+            
             levelData = [];
-            for (let i = 1; i <= 15; i++) {
-                let found = false;
+            for (let i = 1; i <= targetLoad; i++) {
+                let foundUrl = null;
                 for (const ext of FORMATS) {
                     const url = `${i}${ext}`;
                     const exists = await new Promise(r => {
-                        const img = new Image(); img.onload = () => r(true); img.onerror = () => r(false); img.src = url;
+                        const img = new Image(); 
+                        img.onload = () => r(true); 
+                        img.onerror = () => r(false); 
+                        img.src = url;
                     });
-                    if (exists) { levelData.push({ id: i, url }); found = true; break; }
+                    if (exists) { foundUrl = url; break; }
                 }
-                if (!found) break;
+                if (foundUrl) {
+                    levelData.push({ id: i, url: foundUrl });
+                } else if (i > currentMax + 1) {
+                    // 如果超过了当前可玩等级且没找到图，才停止
+                    break;
+                }
             }
             renderMenu();
         }
@@ -246,17 +263,17 @@
             });
         }
 
-        // --- 6. 核心游戏逻辑 (v4.2 经典交换逻辑) ---
+        // --- 6. 核心游戏逻辑 (问题2修复：融合拖动) ---
         function startLevel(id) {
             isVictory = false; currentLevelId = id;
             const lv = levelData.find(l => l.id === id);
+            if(!lv) return showMenu();
             currentImgUrl = lv.url;
             
             const img = new Image();
             img.src = currentImgUrl;
             img.onload = () => {
                 const ratio = img.naturalWidth / img.naturalHeight;
-                // 难度阶梯
                 cols = 3 + Math.floor((id - 1) / 5);
                 rows = Math.round(cols / ratio);
                 
@@ -282,7 +299,6 @@
             for (let i = 0; i < rows * cols; i++) {
                 pieces.push({ id: i, cur: i, bx: (i % cols) * pW, by: Math.floor(i / cols) * pH });
             }
-            // 打乱
             let pool = [...Array(rows * cols).keys()].sort(() => Math.random() - 0.5);
             pieces.forEach((p, i) => p.cur = pool[i]);
             renderPieces();
@@ -300,12 +316,13 @@
             pieces.sort((a,b) => a.cur - b.cur).forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'piece';
+                div.dataset.id = p.id; // 重要：绑定原始ID用于查找
                 div.style.width = `${pW}px`; div.style.height = `${pH}px`;
                 div.style.backgroundImage = `url(${currentImgUrl})`;
                 div.style.backgroundPosition = `-${p.bx}px -${p.by}px`;
                 div.style.backgroundSize = `${pW * cols}px ${pH * rows}px`;
 
-                // 缝隙逻辑
+                // 缝隙与融合逻辑
                 const pos = p.cur, r = Math.floor(pos / cols), c = pos % cols;
                 if (c < cols - 1 && gridMap[pos+1]?.id === p.id+1 && Math.floor(p.id/cols) === Math.floor((p.id+1)/cols)) div.classList.add('no-border-right');
                 if (c > 0 && gridMap[pos-1]?.id === p.id-1 && Math.floor(p.id/cols) === Math.floor((p.id-1)/cols)) div.classList.add('no-border-left');
@@ -322,16 +339,20 @@
             const group = getGroup(id);
             const startX = e.clientX, startY = e.clientY;
             
+            // 获取所有属于该组的 DOM 元素
+            const groupEls = [];
             group.forEach(gid => {
-                const el = document.querySelector(`.piece[style*="background-position: -${pieces.find(x=>x.id===gid).bx}px"]`);
-                if(el) el.style.zIndex = "100";
+                const el = document.querySelector(`.piece[data-id="${gid}"]`);
+                if(el) {
+                    el.style.zIndex = "100";
+                    groupEls.push(el);
+                }
             });
 
             window.onpointermove = (ev) => {
                 const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                group.forEach(gid => {
-                    const el = document.querySelector(`.piece[style*="background-position: -${pieces.find(x=>x.id===gid).bx}px"]`);
-                    if(el) el.style.transform = `translate(${dx}px, ${dy}px)`;
+                groupEls.forEach(el => {
+                    el.style.transform = `translate(${dx}px, ${dy}px)`;
                 });
             };
 
@@ -349,9 +370,10 @@
                         plan.push({ p, from: p.cur, to: nr * cols + nc });
                     }
                     if (!illegal) {
-                        const targets = plan.map(m => m.to), originals = plan.map(m => m.from);
+                        const targets = plan.map(m => m.to);
+                        // 找出非本组但被占位的受害者
                         const victims = pieces.filter(x => targets.includes(x.cur) && !group.includes(x.id));
-                        const vacant = originals.filter(v => !targets.includes(v));
+                        const vacant = plan.map(m => m.from).filter(v => !targets.includes(v));
                         plan.forEach(m => m.p.cur = m.to);
                         victims.forEach((v, i) => v.cur = vacant[i]);
                     }
@@ -385,6 +407,7 @@
             return Array.from(group);
         }
 
+        // 问题3修复：排行榜数据同步
         async function checkWin() {
             if (pieces.every(p => p.id === p.cur)) {
                 isVictory = true;
@@ -394,19 +417,22 @@
                 if (!completedLevels.includes(currentLevelId)) {
                     completedLevels.push(currentLevelId);
                     localStorage.setItem('puz_save_v45', JSON.stringify(completedLevels));
-                    // 同步 Supabase
-                    DataService.syncProgress(localStorage.getItem('puz_nick_v45'), completedLevels.length);
+                    // 立即同步进度
+                    const nick = localStorage.getItem('puz_nick_v45');
+                    await DataService.syncProgress(nick, completedLevels.length);
                 }
                 
                 updateUserUI(localStorage.getItem('puz_nick_v45'));
+                // 胜利后重新探测新关卡
+                await discoverLevels();
+
                 setTimeout(() => {
-                    if(currentLevelId < 15) startLevel(currentLevelId + 1);
-                    else showMenu();
-                }, 1600);
+                    showMenu();
+                }, 2000);
             }
         }
 
-        // --- 7. 其他 UI 函数 ---
+        // --- 7. UI 函数 ---
         function showMenu() {
             document.getElementById('game-screen').classList.remove('active');
             document.getElementById('menu-screen').classList.add('active');
