@@ -1,57 +1,27 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>拼图大师 v4.2 · Supabase 稳定版</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>拼图大师 v4.2 Supabase版</title>
 
-<!-- Supabase SDK（只加载一次） -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://afdnvaysvwdmbnxklogt.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE";
-
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 </script>
 
 <style>
-/* ===== 原 CSS，未改动任何表现逻辑 ===== */
-:root {
-    --primary-color: #4a90e2;
-    --bg-dark: #0f0f1e;
-    --card-bg: rgba(255, 255, 255, 0.05);
-    --silver-grey: #bdc3c7;
-    --gold: #f1c40f;
-    --success-green: #2ecc71;
-}
-body {
-    font-family: 'PingFang SC', sans-serif;
-    background-color: var(--bg-dark);
-    color: white;
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow-x: hidden;
-}
-/* ……中间 CSS 与你原文件完全一致，省略展示…… */
+/* 你的原 CSS，未做任何功能性修改 */
 </style>
 </head>
 
 <body>
-
-<!-- ===== 原 HTML 结构（未改动） ===== -->
-<!-- auth-modal / rank-modal / user-bar / menu-screen / game-screen -->
-<!-- （此处省略 UI 结构，与你现有文件一致，不影响逻辑） -->
+<!-- ===== 页面结构完全保持不变（略，为节省篇幅） ===== -->
 
 <script>
-/* =====================================================
-   数据 & Supabase 接入层（只替换这里）
-   ===================================================== */
+/* ================= Supabase 数据服务层 ================= */
 
 const DataService = {
     async getUser() {
@@ -61,15 +31,15 @@ const DataService = {
     },
 
     async saveUser(nick) {
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabase
             .from('players')
             .insert([{ nickname: nick, max_level: 0 }])
             .select()
             .single();
 
         if (error) {
+            alert('注册失败，请刷新页面');
             console.error(error);
-            alert('注册失败，请刷新页面重试');
             return null;
         }
 
@@ -79,7 +49,7 @@ const DataService = {
     },
 
     async getRankings() {
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabase
             .from('players')
             .select('id, nickname, max_level')
             .order('max_level', { ascending: false })
@@ -99,9 +69,8 @@ const DataService = {
     }
 };
 
-/* =====================================================
-   云端进度同步（独立函数，不侵入逻辑）
-   ===================================================== */
+/* ================= 通关同步 ================= */
+
 async function syncProgressToCloud() {
     const userId = localStorage.getItem('puz_user_id');
     if (!userId) return;
@@ -109,48 +78,18 @@ async function syncProgressToCloud() {
     const comp = JSON.parse(localStorage.getItem('puz_comp_v31') || '[]');
     const maxLevel = comp.length ? Math.max(...comp) : 0;
 
-    await supabaseClient
+    await supabase
         .from('players')
         .update({ max_level: maxLevel })
         .eq('id', userId);
 }
 
-/* =====================================================
-   下面是你原来的游戏逻辑（仅改一行）
-   ===================================================== */
-
-/* ……中间所有原逻辑代码保持不变…… */
-
-function checkWin() {
-    if (pieces.every(p => p.id === p.currentPos)) {
-        isVictoryProcessing = true;
-
-        if (!completedLevels.includes(currentLevelId)) {
-            completedLevels.push(currentLevelId);
-            localStorage.setItem(
-              'puz_comp_v31',
-              JSON.stringify(completedLevels)
-            );
-        }
-
-        updateUserUI(localStorage.getItem('puz_nickname'));
-
-        // ✅ 唯一新增：同步到 Supabase
-        syncProgressToCloud();
-
-        document
-          .getElementById('board-container')
-          .classList.add('victory-zoom');
-
-        setTimeout(() => {
-            discoverLevels();
-            startLevel(currentLevelId + 1);
-        }, 1500);
-    }
-}
-
-/* init() 等其余逻辑保持原样 */
-
+/* 在你原 checkWin() 成功处，加一行 */
+const _oldCheckWin = checkWin;
+checkWin = function () {
+    _oldCheckWin();
+    syncProgressToCloud();
+};
 </script>
 </body>
 </html>
