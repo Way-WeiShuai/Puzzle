@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图大师 - v4.6 适配优化版</title>
+    <title>拼图大师 - v4.7 修复版</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -25,6 +25,7 @@
             width: 100%; max-width: 800px; padding: 15px 20px; box-sizing: border-box;
             display: flex; justify-content: space-between; align-items: center;
             background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .user-avatar { width: 36px; height: 36px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
 
@@ -34,24 +35,29 @@
             backdrop-filter: blur(10px); padding: 20px;
         }
 
-        /* 游戏板容器 - 关键适配 */
+        /* 游戏板容器 - 修复过大问题 */
         #board-container { 
             position: relative; 
             margin: auto;
             box-shadow: 0 0 30px rgba(0,0,0,0.5);
             transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            /* 关键：限制最大尺寸，防止超出屏幕 */
+            max-width: 95vw;
+            max-height: 70vh;
+            display: flex; align-items: center; justify-content: center;
         }
         #puzzle-board { 
             display: grid; 
             background: #000; 
             border: 2px solid rgba(255,255,255,0.1);
-            overflow: visible; /* 允许拖拽块溢出边界感 */
+            position: relative;
         }
         .piece { 
             box-sizing: border-box; 
             border: 0.5px solid rgba(255,255,255,0.2); 
-            touch-action: none;
+            touch-action: none; /* 关键：禁止触摸时的页面滚动 */
             cursor: pointer;
+            position: relative;
         }
 
         .level-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
@@ -59,7 +65,7 @@
         .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a2e; overflow: hidden; }
         .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
-        .rank-item { display: flex; align-items: center; padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 8px; }
+        .rank-item { display: flex; align-items: center; padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 8px; width: 100%; box-sizing: border-box; }
         .rank-item.is-me { border: 1px solid var(--success-green); background: rgba(46, 204, 113, 0.1); }
         
         .btn { padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
@@ -81,9 +87,11 @@
     </div>
 
     <div id="rank-modal" class="overlay">
-        <h2 style="color:var(--gold)">🏆 世界排名</h2>
-        <div id="rank-list" style="width:100%; max-width:400px; height:60vh; overflow-y:auto; margin-bottom:20px;"></div>
-        <button class="btn" onclick="closeRank()">返回</button>
+        <div style="width: 100%; max-width: 400px; background: #151525; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; max-height: 80vh;">
+            <h2 style="color:var(--gold); text-align: center; margin-top: 0;">🏆 世界排名</h2>
+            <div id="rank-list" style="flex: 1; overflow-y:auto; margin-bottom:20px;"></div>
+            <button class="btn" style="width: 100%; background: #333; color: #fff;" onclick="closeRank()">返回</button>
+        </div>
     </div>
 
     <div id="user-bar">
@@ -113,38 +121,56 @@
     </div>
 
     <script>
+        // --- 1. Supabase 配置 ---
         const SB_URL = 'https://afdnvaysvwdmbnxklogt.supabase.co';
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE';
-        const _db = supabase.createClient(SB_URL, SB_KEY);
+        
+        // 修复：使用 _db 而不是 supabase，避免与 CDN 全局变量冲突
+        let _db = null;
+        try {
+            _db = supabase.createClient(SB_URL, SB_KEY);
+        } catch(e) {
+            console.error("Supabase init error:", e);
+            alert("游戏服务连接失败，排行榜可能不可用");
+        }
 
-        let completedLevels = JSON.parse(localStorage.getItem('puz_done_v46') || '[]');
+        // --- 2. 游戏状态 ---
+        let completedLevels = JSON.parse(localStorage.getItem('puz_done_v47') || '[]');
         let currentLevel = 1, pieces = [], rows, cols, pW, pH;
         let isMoving = false;
 
-        // --- 逻辑 1: 适配屏幕 ---
+        // --- 3. 核心逻辑：关卡与适配 ---
         function startLevel(id) {
             currentLevel = id;
             const img = new Image();
-            img.src = `${id}.jpg`; // 假设均为jpg，可根据实际格式优化
+            // 假设图片在根目录下，命名为 1.jpg, 2.jpg 等
+            img.src = `${id}.jpg`; 
+            
             img.onload = () => {
                 const ratio = img.width / img.height;
-                cols = 3 + Math.floor((id-1)/5);
+                cols = 3 + Math.floor((id-1)/5); // 难度曲线
                 rows = Math.round(cols / ratio);
 
-                // 自适应核心逻辑：计算可用区域
-                const maxW = window.innerWidth * 0.92;
-                const maxH = window.innerHeight * 0.65; // 为UI留出空间
+                // --- 修复图片过大问题 ---
+                // 计算最大可用空间 (宽95%，高65%)
+                const maxW = window.innerWidth * 0.95;
+                const maxH = window.innerHeight * 0.65; 
 
-                // 优先适配宽度，如果高度超标则按高度缩放
+                // 尝试按宽度适配
                 pW = Math.floor(maxW / cols);
                 pH = Math.floor((pW * cols / ratio) / rows);
 
+                // 如果高度超标，则按高度重新计算
                 if (pH * rows > maxH) {
                     pH = Math.floor(maxH / rows);
                     pW = Math.floor((pH * rows * ratio) / cols);
                 }
 
                 setupGame(img.src);
+            };
+            img.onerror = () => {
+                alert("加载图片失败，请检查图片文件是否存在 (例如 1.jpg)");
+                showMenu();
             };
         }
 
@@ -153,19 +179,23 @@
             board.innerHTML = '';
             board.style.width = `${pW * cols}px`;
             board.style.height = `${pH * rows}px`;
-            document.getElementById('victory-img').src = url;
-            document.getElementById('victory-img').style.opacity = '0';
             
+            const vImg = document.getElementById('victory-img');
+            vImg.src = url;
+            vImg.style.opacity = '0';
+            
+            // 生成拼图数据
             pieces = [];
             for(let i=0; i<rows*cols; i++) {
                 pieces.push({ id: i, cur: i, bx: (i%cols)*pW, by: Math.floor(i/cols)*pH });
             }
             
-            // 打乱
+            // 打乱拼图
             let pool = pieces.map(p => p.id).sort(() => Math.random() - 0.5);
             pieces.forEach((p, i) => p.cur = pool[i]);
 
             renderPieces(url);
+            
             document.getElementById('menu-screen').classList.remove('active');
             document.getElementById('game-screen').classList.add('active');
             document.getElementById('game-info').innerText = `Level ${currentLevel} (${cols}x${rows})`;
@@ -175,6 +205,7 @@
             const board = document.getElementById('puzzle-board');
             board.innerHTML = '';
             
+            // 按当前位置排序渲染，保证 DOM 顺序正确
             pieces.sort((a,b) => a.cur - b.cur).forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'piece';
@@ -182,46 +213,58 @@
                 div.style.backgroundImage = `url(${url})`;
                 div.style.backgroundPosition = `-${p.bx}px -${p.by}px`;
                 div.style.backgroundSize = `${pW*cols}px ${pH*rows}px`;
-                div.dataset.id = p.id;
+                div.dataset.id = p.id; // 绑定原始 ID
                 
-                // 融合视觉：如果左右/上下相邻且正确，隐藏边框
-                checkVisualMerge(div, p);
+                // 视觉融合优化
+                const r = Math.floor(p.cur/cols), c = p.cur%cols;
+                const right = pieces.find(x => x.cur === p.cur+1);
+                const down = pieces.find(x => x.cur === p.cur+cols);
+                
+                // 如果右侧是正确的邻居，去除右边框
+                if (c < cols-1 && right?.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(right.id/cols)) {
+                    div.style.borderRightColor = 'transparent';
+                }
+                // 如果下方是正确的邻居，去除下边框
+                if (r < rows-1 && down?.id === p.id+cols) {
+                    div.style.borderBottomColor = 'transparent';
+                }
 
                 div.onpointerdown = e => handleDrag(e, p.id, url);
                 board.appendChild(div);
             });
         }
 
-        function checkVisualMerge(el, p) {
-            const r = Math.floor(p.cur/cols), c = p.cur%cols;
-            const right = pieces.find(x => x.cur === p.cur+1);
-            const down = pieces.find(x => x.cur === p.cur+cols);
-            if (c < cols-1 && right?.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(right.id/cols)) el.style.borderRightColor = 'transparent';
-            if (r < rows-1 && down?.id === p.id+cols) el.style.borderBottomColor = 'transparent';
-        }
-
-        // --- 逻辑 2: 拖拽与融合 ---
+        // --- 4. 拖拽与融合逻辑 ---
         function handleDrag(e, id, url) {
             if(isMoving) return;
-            const group = getGroup(id);
+            const group = getGroup(id); // 获取融合组
             const startX = e.clientX, startY = e.clientY;
             const els = group.map(gid => document.querySelector(`[data-id="${gid}"]`));
             
-            els.forEach(el => { el.style.zIndex = 1000; el.style.transition = 'none'; });
+            // 提升层级
+            els.forEach(el => { 
+                if(el) { el.style.zIndex = 1000; el.style.transition = 'none'; }
+            });
 
             window.onpointermove = (ev) => {
                 const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                els.forEach(el => el.style.transform = `translate(${dx}px, ${dy}px)`);
+                els.forEach(el => {
+                    if(el) el.style.transform = `translate(${dx}px, ${dy}px)`;
+                });
             };
 
             window.onpointerup = (ev) => {
                 window.onpointermove = null; window.onpointerup = null;
                 const dx = ev.clientX - startX, dy = ev.clientY - startY;
+                
+                // 计算移动格子数
                 const dC = Math.round(dx/pW), dR = Math.round(dy/pH);
 
                 if (dC !== 0 || dR !== 0) {
                     let canMove = true;
                     const updates = [];
+                    
+                    // 检查组内每个块是否能移动到目标位置
                     for(let gid of group) {
                         const p = pieces.find(x => x.id === gid);
                         const nr = Math.floor(p.cur/cols)+dR, nc = (p.cur%cols)+dC;
@@ -231,13 +274,16 @@
 
                     if(canMove) {
                         const targetPos = updates.map(u => u.to);
+                        // 找到目标位置上的"受害者"（非本组的块）
                         const victims = pieces.filter(x => targetPos.includes(x.cur) && !group.includes(x.id));
                         const vacants = updates.map(u => u.from).filter(v => !targetPos.includes(v));
+                        
+                        // 交换位置
                         updates.forEach(u => u.p.cur = u.to);
                         victims.forEach((v, i) => v.cur = vacants[i]);
                     }
                 }
-                renderPieces(url);
+                renderPieces(url); // 重新渲染
                 checkWin();
             };
         }
@@ -247,16 +293,20 @@
             while(queue.length > 0) {
                 const id = queue.shift(), p = pieces.find(x => x.id === id);
                 const r = Math.floor(p.cur/cols), c = p.cur%cols;
+                
+                // 检查上下左右四个方向
                 const neighbors = [
-                    {dr:0, dc:1,  cond: n => n.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(n.id/cols)},
-                    {dr:0, dc:-1, cond: n => n.id === p.id-1 && Math.floor(p.id/cols) === Math.floor(n.id/cols)},
-                    {dr:1, dc:0,  cond: n => n.id === p.id+cols},
-                    {dr:-1,dc:0,  cond: n => n.id === p.id-cols}
+                    {dr:0, dc:1,  cond: n => n.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(n.id/cols)}, // 右
+                    {dr:0, dc:-1, cond: n => n.id === p.id-1 && Math.floor(p.id/cols) === Math.floor(n.id/cols)}, // 左
+                    {dr:1, dc:0,  cond: n => n.id === p.id+cols}, // 下
+                    {dr:-1,dc:0,  cond: n => n.id === p.id-cols}  // 上
                 ];
+                
                 neighbors.forEach(n => {
                     const nr = r+n.dr, nc = c+n.dc;
                     if(nr>=0 && nr<rows && nc>=0 && nc<cols) {
                         const found = pieces.find(x => x.cur === nr*cols+nc);
+                        // 如果邻居存在，且ID连续（匹配正确），则加入组
                         if(found && !group.has(found.id) && n.cond(found)) {
                             group.add(found.id); queue.push(found.id);
                         }
@@ -266,19 +316,21 @@
             return Array.from(group);
         }
 
-        // --- 逻辑 3: 排行榜数据补全 ---
+        // --- 5. 胜利与数据同步 ---
         async function checkWin() {
             if (pieces.every(p => p.id === p.cur)) {
                 isMoving = true;
+                // 胜利特效
                 document.getElementById('victory-img').style.opacity = '1';
                 document.getElementById('board-container').style.transform = 'scale(1.05)';
                 
+                // 保存进度
                 if (!completedLevels.includes(currentLevel)) {
                     completedLevels.push(currentLevel);
-                    localStorage.setItem('puz_done_v46', JSON.stringify(completedLevels));
+                    localStorage.setItem('puz_done_v47', JSON.stringify(completedLevels));
                 }
 
-                // 强制同步到排行榜
+                // 同步数据
                 await syncMyData();
                 updateUI();
 
@@ -290,11 +342,13 @@
         }
 
         async function syncMyData() {
-            const uid = localStorage.getItem('puz_uid_v46');
-            const nick = localStorage.getItem('puz_nick_v46');
+            if(!_db) return;
+            const uid = localStorage.getItem('puz_uid_v47');
+            const nick = localStorage.getItem('puz_nick_v47');
             if(!uid || !nick) return;
 
             try {
+                // Upsert 数据到 Supabase
                 const { error } = await _db.from('rankings').upsert({
                     id: uid, 
                     nickname: nick, 
@@ -305,29 +359,47 @@
             } catch(e) { console.error(e); }
         }
 
+        // --- 6. UI 与初始化 ---
         async function openRank() {
             const modal = document.getElementById('rank-modal');
             const list = document.getElementById('rank-list');
             modal.style.display = 'flex';
-            list.innerHTML = '<div style="text-align:center; padding:20px;">加载中...</div>';
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa;">正在加载排行榜...</div>';
+
+            if(!_db) {
+                list.innerHTML = '<div style="text-align:center; padding:20px;">排行榜服务暂不可用</div>';
+                return;
+            }
 
             try {
-                const { data } = await _db.from('rankings').select('*').order('max_level', {ascending: false}).limit(30);
-                const myUid = localStorage.getItem('puz_uid_v46');
+                // 读取前30名
+                const { data, error } = await _db.from('rankings')
+                    .select('*')
+                    .order('max_level', {ascending: false})
+                    .order('updated_at', {ascending: true}) // 等级相同时，先达成的排前面
+                    .limit(30);
+
+                if(error) throw error;
+
+                const myUid = localStorage.getItem('puz_uid_v47');
                 
                 list.innerHTML = (data || []).map((r, i) => `
                     <div class="rank-item ${r.id === myUid ? 'is-me' : ''}">
-                        <div style="width:30px; font-weight:bold;">${i+1}</div>
-                        <div style="flex:1">${r.nickname} ${r.id === myUid ? '⭐' : ''}</div>
-                        <div style="color:var(--primary-color)">Lv.${r.max_level}</div>
+                        <div style="width:30px; font-weight:bold; color:${i<3?'var(--gold)':'#fff'}">${i+1}</div>
+                        <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            ${escapeHtml(r.nickname)} ${r.id === myUid ? '(我)' : ''}
+                        </div>
+                        <div style="color:var(--primary-color); font-weight:bold;">Lv.${r.max_level}</div>
                     </div>
-                `).join('') || '<div style="text-align:center; padding:20px;">暂无排名</div>';
-            } catch(e) { list.innerHTML = '排名加载失败'; }
+                `).join('') || '<div style="text-align:center; padding:20px;">暂无排名，快来抢占第一！</div>';
+            } catch(e) { 
+                console.error(e);
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:red;">加载失败，请检查网络</div>'; 
+            }
         }
 
-        // --- 初始化与基础函数 ---
         function init() {
-            const nick = localStorage.getItem('puz_nick_v46');
+            const nick = localStorage.getItem('puz_nick_v47');
             if(!nick) {
                 document.getElementById('auth-modal').style.display = 'flex';
             } else {
@@ -337,10 +409,15 @@
         }
 
         function registerUser() {
-            const nick = document.getElementById('nickname-input').value.trim() || '新拼图手';
+            const input = document.getElementById('nickname-input');
+            const nick = input.value.trim();
+            if(!nick) return alert("请输入昵称");
+            
+            // 生成唯一 ID 并保存
             const uid = 'ID_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('puz_nick_v46', nick);
-            localStorage.setItem('puz_uid_v46', uid);
+            localStorage.setItem('puz_nick_v47', nick);
+            localStorage.setItem('puz_uid_v47', uid);
+            
             document.getElementById('auth-modal').style.display = 'none';
             syncMyData().then(() => {
                 updateUI();
@@ -349,17 +426,17 @@
         }
 
         function updateUI() {
-            const nick = localStorage.getItem('puz_nick_v46');
+            const nick = localStorage.getItem('puz_nick_v47');
             document.getElementById('u-name').innerText = nick || '匿名';
-            document.getElementById('u-avatar').innerText = (nick || '?')[0];
+            document.getElementById('u-avatar').innerText = (nick || '?')[0].toUpperCase();
             document.getElementById('u-lv').innerText = `已完成: ${completedLevels.length}`;
         }
 
-        async function renderMenu() {
+        function renderMenu() {
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
             
-            // 逻辑 1 的优化：加载 当前等级+5 的图片
+            // 逻辑：加载当前完成数量 + 5 的关卡
             const showCount = completedLevels.length + 5;
             for(let i=1; i<=showCount; i++) {
                 const isUnlocked = i === 1 || completedLevels.includes(i-1);
@@ -387,6 +464,7 @@
         }
 
         function closeRank() { document.getElementById('rank-modal').style.display = 'none'; }
+        function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
         window.onload = init;
     </script>
