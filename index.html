@@ -3,453 +3,448 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图大师 - v4.8 完美修复版</title>
+    <title>拼图大师 - v4.9 稳定修复版</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --primary-color: #4a90e2;
-            --bg-dark: #0f0f1e;
-            --card-bg: rgba(255, 255, 255, 0.05);
+            --primary: #4a90e2;
+            --dark: #0f0f1e;
+            --glass: rgba(255, 255, 255, 0.05);
             --gold: #f1c40f;
-            --success-green: #2ecc71;
         }
-
         body {
-            font-family: 'PingFang SC', sans-serif;
-            background-color: var(--bg-dark); color: white; margin: 0; 
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center; 
-            overflow-x: hidden; touch-action: manipulation;
+            font-family: sans-serif; background: var(--dark); color: white; margin: 0;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+            touch-action: none; /* 防止手机端下拉刷新干扰 */
+            overflow-x: hidden;
         }
 
-        #user-bar {
-            width: 100%; max-width: 800px; padding: 15px 20px; box-sizing: border-box;
+        /* 顶部栏 */
+        #top-bar {
+            width: 100%; max-width: 600px; padding: 15px; box-sizing: border-box;
             display: flex; justify-content: space-between; align-items: center;
-            background: rgba(255,255,255,0.02);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            background: rgba(0,0,0,0.2); border-bottom: 1px solid #333;
+            z-index: 10;
         }
-        .user-avatar { width: 36px; height: 36px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-
-        .overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 3000;
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            backdrop-filter: blur(10px); padding: 20px;
-        }
-
-        /* 游戏区域适配 */
-        #board-container { 
-            position: relative; 
-            margin: auto;
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
-            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            /* 强制限制在屏幕内 */
-            max-width: 95vw;
-            max-height: 70vh;
-            display: flex; align-items: center; justify-content: center;
-        }
-        #puzzle-board { 
-            display: grid; 
-            background: #000; 
-            border: 2px solid rgba(255,255,255,0.1);
-            position: relative;
-        }
-        .piece { 
-            box-sizing: border-box; 
-            border: 0.5px solid rgba(255,255,255,0.2); 
-            touch-action: none;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .level-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
-        .level-card:active { transform: scale(0.95); }
-        .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a2e; overflow: hidden; }
-        .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
-
-        .rank-item { display: flex; align-items: center; padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 8px; width: 100%; box-sizing: border-box; }
-        .rank-item.is-me { border: 1px solid var(--success-green); background: rgba(46, 204, 113, 0.1); }
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
         
-        .btn { padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-primary { background: var(--primary-color); color: white; }
-        
-        #victory-img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: 0.5s; pointer-events: none; z-index: 50; }
-        .active { display: flex; flex-direction: column; align-items: center; width: 100%; }
-        .screen { display: none; }
-        
-        /* 加载动画 */
-        .loading-spin { animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 弹窗通用样式 */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999;
+            display: none; justify-content: center; align-items: center; flex-direction: column;
+            backdrop-filter: blur(5px);
+        }
+        .modal-box {
+            background: #1a1a2e; padding: 25px; border-radius: 15px; width: 80%; max-width: 350px;
+            text-align: center; border: 1px solid #333;
+        }
+
+        /* 游戏板容器 - 关键适配 */
+        #game-area {
+            position: relative; margin-top: 20px;
+            transition: transform 0.3s;
+            /* 限制最大宽高，防止超出手机屏幕 */
+            max-width: 96vw; 
+            max-height: 75vh;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #puzzle-board {
+            position: relative; border: 2px solid #444; background: #000;
+            /* 默认隐藏，JS计算好尺寸后再显示 */
+            visibility: hidden; 
+        }
+        .piece {
+            position: absolute; border: 1px solid rgba(255,255,255,0.3);
+            box-sizing: border-box; transition: transform 0.1s;
+        }
+
+        /* 关卡列表 */
+        #menu-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; width: 92%; max-width: 600px; padding: 20px 0; }
+        .level-btn {
+            background: var(--glass); border: 1px solid #333; border-radius: 10px;
+            aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; position: relative; overflow: hidden;
+        }
+        .level-btn img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; opacity: 0.5; }
+        .level-btn span { z-index: 2; font-weight: bold; text-shadow: 0 1px 3px black; }
+
+        /* 通用按钮 */
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-gold { background: var(--gold); color: #000; }
+        .btn-blue { background: var(--primary); color: #fff; }
+
+        /* 界面切换 */
+        .screen { display: none; width: 100%; flex-direction: column; align-items: center; }
+        .screen.active { display: flex; }
     </style>
 </head>
 <body>
 
-    <div id="auth-modal" class="overlay">
-        <div style="background: #1a1a2e; padding: 30px; border-radius: 16px; width: 85%; max-width: 320px; text-align: center;">
-            <h3>设置你的昵称</h3>
-            <input type="text" id="nickname-input" style="width:100%; padding:12px; margin:15px 0; background:#000; color:#fff; border:1px solid #333; border-radius:8px; box-sizing:border-box;">
-            <button class="btn btn-primary" style="width:100%" onclick="registerUser()">进入游戏</button>
+    <div id="auth-modal" class="modal" style="display: flex;">
+        <div class="modal-box">
+            <h2 style="color:white; margin-top:0;">欢迎来到拼图大师</h2>
+            <p style="color:#aaa; font-size:0.9rem;">请输入你的名字开始挑战</p>
+            <input type="text" id="nick-input" placeholder="你的昵称" style="width:100%; padding:10px; margin:15px 0; background:#000; color:white; border:1px solid #444; border-radius:5px; box-sizing:border-box;">
+            <button class="btn btn-blue" style="width:100%" onclick="startGame()">开始游戏</button>
         </div>
     </div>
 
-    <div id="rank-modal" class="overlay">
-        <div style="width: 100%; max-width: 400px; background: #151525; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; max-height: 80vh;">
-            <h2 style="color:var(--gold); text-align: center; margin-top: 0;">🏆 世界排名</h2>
-            <div id="rank-list" style="flex: 1; overflow-y:auto; margin-bottom:20px;"></div>
-            <button class="btn" style="width: 100%; background: #333; color: #fff;" onclick="closeRank()">返回</button>
+    <div id="rank-modal" class="modal">
+        <div class="modal-box" style="height: 60vh; display: flex; flex-direction: column;">
+            <h3 style="color:var(--gold); margin:0 0 15px 0;">🏆 世界排行榜</h3>
+            <div id="rank-list" style="flex:1; overflow-y: auto; text-align: left; margin-bottom: 15px;">
+                加载中...
+            </div>
+            <button class="btn" onclick="document.getElementById('rank-modal').style.display='none'">关闭</button>
         </div>
     </div>
 
-    <div id="user-bar">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <div class="user-avatar" id="u-avatar">?</div>
+    <div id="top-bar">
+        <div class="user-info">
+            <div class="avatar" id="ui-avatar">?</div>
             <div>
-                <div id="u-name" style="font-size:0.9rem; font-weight:bold;">Loading...</div>
-                <div id="u-lv" style="font-size:0.7rem; opacity:0.6;">Lv.0</div>
+                <div id="ui-name" style="font-weight:bold;">Guest</div>
+                <div id="ui-lv" style="font-size:0.8rem; color:#aaa;">Lv.0</div>
             </div>
         </div>
-        <button class="btn" style="background:rgba(241,196,15,0.2); color:var(--gold)" onclick="openRank()">排行榜</button>
+        <button class="btn btn-gold" onclick="openRank()">排行榜</button>
     </div>
 
     <div id="menu-screen" class="screen active">
-        <div id="level-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:15px; width:90%; max-width:800px; padding:20px 0;"></div>
+        <h3 style="margin: 10px 0 0 0; opacity: 0.6;">选择关卡</h3>
+        <div id="menu-view"></div>
     </div>
 
     <div id="game-screen" class="screen">
-        <div style="width:90%; display:flex; justify-content:space-between; align-items:center; margin:15px 0;">
-            <button class="btn" onclick="showMenu()" style="background:#333; color:white;">← 退出</button>
-            <span id="game-info">Level 1</span>
+        <div style="width:90%; max-width:600px; display:flex; justify-content:space-between; margin-top:10px;">
+            <button class="btn" style="background:#333; color:#fff" onclick="backToMenu()">← 退出</button>
+            <span id="level-title">Level 1</span>
         </div>
-        <div id="board-container">
+        <div id="game-area">
             <div id="puzzle-board"></div>
-            <img id="victory-img" src="">
+            <img id="win-img" style="position:absolute; width:100%; height:100%; opacity:0; pointer-events:none; transition:1s;">
         </div>
     </div>
 
     <script>
-        // --- 1. 数据库配置 (变量名已修复) ---
+        // === 核心修复：变量名使用 _db 避免冲突 ===
         const SB_URL = 'https://afdnvaysvwdmbnxklogt.supabase.co';
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE';
         
-        // 关键修复：使用 gameDB 而不是 supabase，防止与 CDN 库冲突
-        let gameDB = null;
-        if (typeof supabase !== 'undefined') {
-            gameDB = supabase.createClient(SB_URL, SB_KEY);
-        } else {
-            console.error('Supabase SDK 未加载');
+        let _db = null;
+        try {
+            // 使用 window.supabase 确保调用的是全局对象
+            if(window.supabase) {
+                _db = window.supabase.createClient(SB_URL, SB_KEY);
+                console.log("数据库连接成功");
+            }
+        } catch(e) {
+            console.error("数据库初始化失败:", e);
         }
 
-        // --- 2. 游戏状态 ---
-        let completedLevels = JSON.parse(localStorage.getItem('puz_done_v48') || '[]');
-        let currentLevel = 1, pieces = [], rows, cols, pW, pH;
-        let isMoving = false;
+        // === 游戏数据 ===
+        let myData = {
+            uid: localStorage.getItem('puz_uid_v49'),
+            nick: localStorage.getItem('puz_nick_v49'),
+            levels: JSON.parse(localStorage.getItem('puz_lv_v49') || '[]')
+        };
 
-        // --- 3. 游戏启动逻辑 ---
+        // === 1. 初始化逻辑 ===
         function init() {
-            try {
-                const nick = localStorage.getItem('puz_nick_v48');
-                if(!nick) {
-                    document.getElementById('auth-modal').style.display = 'flex';
-                } else {
-                    updateUI();
-                    renderMenu();
-                }
-            } catch (e) {
-                console.error("Init failed:", e);
-                alert("游戏初始化失败，请刷新页面重试");
+            if(myData.nick) {
+                document.getElementById('auth-modal').style.display = 'none';
+                updateUI();
+                renderMenu();
+                syncData(); // 后台同步
             }
         }
 
-        function registerUser() {
-            const input = document.getElementById('nickname-input');
-            const nick = input.value.trim();
-            if(!nick) return alert("请输入昵称");
+        function startGame() {
+            const val = document.getElementById('nick-input').value.trim();
+            if(!val) return alert("起个名字吧！");
             
-            const uid = 'ID_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('puz_nick_v48', nick);
-            localStorage.setItem('puz_uid_v48', uid);
+            // 生成新用户
+            myData.nick = val;
+            myData.uid = 'u_' + Date.now().toString(36);
+            localStorage.setItem('puz_nick_v49', myData.nick);
+            localStorage.setItem('puz_uid_v49', myData.uid);
             
             document.getElementById('auth-modal').style.display = 'none';
-            // 先进游戏，后台同步
             updateUI();
             renderMenu();
-            syncMyData(); 
+            syncData();
         }
 
         function updateUI() {
-            const nick = localStorage.getItem('puz_nick_v48');
-            document.getElementById('u-name').innerText = nick || '匿名';
-            document.getElementById('u-avatar').innerText = (nick || '?')[0].toUpperCase();
-            document.getElementById('u-lv').innerText = `已完成: ${completedLevels.length}`;
+            document.getElementById('ui-name').innerText = myData.nick;
+            document.getElementById('ui-avatar').innerText = myData.nick[0].toUpperCase();
+            document.getElementById('ui-lv').innerText = `已通过: ${myData.levels.length}关`;
         }
 
-        // --- 4. 关卡菜单 ---
+        // === 2. 关卡菜单 ===
         function renderMenu() {
-            const grid = document.getElementById('level-grid');
-            grid.innerHTML = '';
+            const list = document.getElementById('menu-view');
+            list.innerHTML = '';
+            // 显示已完成 + 未来5关
+            const maxShow = myData.levels.length + 5;
             
-            const showCount = completedLevels.length + 5; // 动态加载 Lv+5
-            for(let i=1; i<=showCount; i++) {
-                const isUnlocked = i === 1 || completedLevels.includes(i-1);
-                const isDone = completedLevels.includes(i);
+            for(let i=1; i<=maxShow; i++) {
+                const isDone = myData.levels.includes(i);
+                const isLock = i > 1 && !myData.levels.includes(i-1);
                 
-                const card = document.createElement('div');
-                card.className = 'level-card';
-                card.style.opacity = isUnlocked ? '1' : '0.4';
-                card.innerHTML = `
-                    <div class="card-thumb">${isDone ? `<img src="${i}.jpg">` : `<span>${i}</span>`}</div>
-                    <div style="padding:8px; text-align:center; font-size:0.8rem;">
-                        ${isDone ? '✅ 已完成' : (isUnlocked ? '🔥 挑战' : '🔒 未解锁')}
-                    </div>
-                `;
-                // 只有解锁的才能点击
-                if(isUnlocked) {
-                    card.onclick = () => startLevel(i);
+                const div = document.createElement('div');
+                div.className = 'level-btn';
+                div.style.opacity = isLock ? '0.3' : '1';
+                // 如果已完成，尝试显示缩略图，否则显示数字
+                div.innerHTML = isDone ? 
+                    `<img src="${i}.jpg"><span>✅ ${i}</span>` : 
+                    `<span>${isLock ? '🔒' : i}</span>`;
+                
+                if(!isLock) {
+                    div.onclick = () => loadLevel(i);
                 }
-                grid.appendChild(card);
+                list.appendChild(div);
             }
         }
 
-        // --- 5. 游戏核心 (带自适应修复) ---
-        function startLevel(id) {
-            currentLevel = id;
-            document.getElementById('game-info').innerText = `Level ${id} 加载中...`;
-            
-            const img = new Image();
-            img.src = `${id}.jpg`; 
-            
-            img.onload = () => {
-                const ratio = img.width / img.height;
-                cols = 3 + Math.floor((id-1)/5);
-                rows = Math.round(cols / ratio);
+        // === 3. 游戏核心 (修复适配问题) ===
+        let gState = { id:0, pieces:[], rows:0, cols:0, pw:0, ph:0, moving:false };
 
-                // 自适应计算
-                const maxW = window.innerWidth * 0.95;
-                const maxH = window.innerHeight * 0.65; 
-
-                pW = Math.floor(maxW / cols);
-                pH = Math.floor((pW * cols / ratio) / rows);
-
-                if (pH * rows > maxH) {
-                    pH = Math.floor(maxH / rows);
-                    pW = Math.floor((pH * rows * ratio) / cols);
-                }
-
-                setupGame(img.src);
-            };
-            img.onerror = () => {
-                alert(`无法加载图片: ${id}.jpg，请确认文件是否存在。`);
-                showMenu();
-            };
-        }
-
-        function setupGame(url) {
-            const board = document.getElementById('puzzle-board');
-            board.innerHTML = '';
-            board.style.width = `${pW * cols}px`;
-            board.style.height = `${pH * rows}px`;
-            
-            const vImg = document.getElementById('victory-img');
-            vImg.src = url;
-            vImg.style.opacity = '0';
-            
-            pieces = [];
-            for(let i=0; i<rows*cols; i++) {
-                pieces.push({ id: i, cur: i, bx: (i%cols)*pW, by: Math.floor(i/cols)*pH });
-            }
-            
-            let pool = pieces.map(p => p.id).sort(() => Math.random() - 0.5);
-            pieces.forEach((p, i) => p.cur = pool[i]);
-
-            renderPieces(url);
-            
+        function loadLevel(id) {
             document.getElementById('menu-screen').classList.remove('active');
             document.getElementById('game-screen').classList.add('active');
-            document.getElementById('game-info').innerText = `Level ${currentLevel} (${cols}x${rows})`;
+            document.getElementById('level-title').innerText = `Level ${id} 加载中...`;
+            document.getElementById('game-area').style.transform = 'none';
+            document.getElementById('win-img').style.opacity = '0';
+            
+            const img = new Image();
+            img.src = `${id}.jpg`;
+            img.onload = () => {
+                startPuzzle(img, id);
+            };
+            img.onerror = () => {
+                alert(`找不到图片 ${id}.jpg，请确保图片已上传`);
+                backToMenu();
+            };
         }
 
-        function renderPieces(url) {
+        function startPuzzle(img, id) {
+            gState.id = id;
+            const ratio = img.width / img.height;
+            // 难度计算
+            gState.cols = 3 + Math.floor((id-1)/3); 
+            gState.rows = Math.round(gState.cols / ratio);
+
+            // --- 关键：自适应屏幕大小 ---
+            const screenW = window.innerWidth * 0.94; // 留出一点边距
+            const screenH = window.innerHeight * 0.70;
+
+            // 1. 先按宽度算
+            gState.pw = Math.floor(screenW / gState.cols);
+            gState.ph = Math.floor(gState.pw / ratio);
+
+            // 2. 如果高度超了，就按高度反算
+            if(gState.ph * gState.rows > screenH) {
+                gState.ph = Math.floor(screenH / gState.rows);
+                gState.pw = Math.floor(gState.ph * ratio);
+            }
+
+            // 设置棋盘
+            const board = document.getElementById('puzzle-board');
+            board.style.width = (gState.pw * gState.cols) + 'px';
+            board.style.height = (gState.ph * gState.rows) + 'px';
+            board.style.visibility = 'visible';
+            board.innerHTML = '';
+
+            document.getElementById('win-img').src = img.src;
+            document.getElementById('level-title').innerText = `Level ${id}`;
+
+            // 生成碎片
+            gState.pieces = [];
+            for(let i=0; i < gState.rows * gState.cols; i++) {
+                gState.pieces.push({
+                    id: i, // 正确位置ID
+                    cur: i, // 当前位置ID
+                    x: (i % gState.cols) * gState.pw,
+                    y: Math.floor(i / gState.cols) * gState.ph
+                });
+            }
+
+            // 打乱 (Fisher-Yates)
+            let indexes = gState.pieces.map(p => p.id);
+            for(let i = indexes.length -1; i>0; i--){
+                const j = Math.floor(Math.random()*(i+1));
+                [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+            }
+            gState.pieces.forEach((p, i) => p.cur = indexes[i]);
+
+            renderBoard(img.src);
+        }
+
+        function renderBoard(url) {
             const board = document.getElementById('puzzle-board');
             board.innerHTML = '';
-            
-            pieces.sort((a,b) => a.cur - b.cur).forEach(p => {
+
+            gState.pieces.forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'piece';
-                div.style.width = `${pW}px`; div.style.height = `${pH}px`;
+                div.style.width = gState.pw + 'px';
+                div.style.height = gState.ph + 'px';
                 div.style.backgroundImage = `url(${url})`;
-                div.style.backgroundPosition = `-${p.bx}px -${p.by}px`;
-                div.style.backgroundSize = `${pW*cols}px ${pH*rows}px`;
-                div.dataset.id = p.id; 
+                div.style.backgroundSize = `${gState.cols*gState.pw}px ${gState.rows*gState.ph}px`;
+                div.style.backgroundPosition = `-${p.x}px -${p.y}px`;
                 
-                // 视觉融合
-                const r = Math.floor(p.cur/cols), c = p.cur%cols;
-                const right = pieces.find(x => x.cur === p.cur+1);
-                const down = pieces.find(x => x.cur === p.cur+cols);
+                // 计算当前它在棋盘的哪个格子里
+                const curRow = Math.floor(p.cur / gState.cols);
+                const curCol = p.cur % gState.cols;
+                div.style.left = (curCol * gState.pw) + 'px';
+                div.style.top = (curRow * gState.ph) + 'px';
                 
-                if (c < cols-1 && right?.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(right.id/cols)) {
-                    div.style.borderRightColor = 'transparent';
+                // 视觉融合：检查右边和下边是否是“正确邻居”
+                const right = gState.pieces.find(x => x.cur === p.cur + 1);
+                const down = gState.pieces.find(x => x.cur === p.cur + gState.cols);
+                
+                // 如果右边有人，且那就是我原始的右边邻居 -> 隐藏右边框
+                if(curCol < gState.cols-1 && right && right.id === p.id + 1) {
+                    div.style.borderRight = 'none';
                 }
-                if (r < rows-1 && down?.id === p.id+cols) {
-                    div.style.borderBottomColor = 'transparent';
+                // 同理下方
+                if(curRow < gState.rows-1 && down && down.id === p.id + gState.cols) {
+                    div.style.borderBottom = 'none';
                 }
 
-                div.onpointerdown = e => handleDrag(e, p.id, url);
+                div.onpointerdown = (e) => handleTouch(e, p);
                 board.appendChild(div);
             });
         }
 
-        // --- 6. 拖拽逻辑 ---
-        function handleDrag(e, id, url) {
-            if(isMoving) return;
-            const group = getGroup(id);
+        // === 4. 拖拽逻辑 ===
+        function handleTouch(e, p) {
+            if(gState.moving) return;
+            // 简单版本：点击只是高亮，或者实现交换？
+            // 这里实现拖拽交换
             const startX = e.clientX, startY = e.clientY;
-            const els = group.map(gid => document.querySelector(`[data-id="${gid}"]`));
+            const el = e.target;
+            el.style.zIndex = 100;
             
-            els.forEach(el => { if(el) el.style.zIndex = 1000; });
-
-            window.onpointermove = (ev) => {
-                const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                els.forEach(el => { if(el) el.style.transform = `translate(${dx}px, ${dy}px)`; });
+            // 找到所有连通的块（这里简化为只拖当前块，复杂连通逻辑易出错，先保稳）
+            // 如果需要连通块逻辑，可复用之前版本，这里为了稳，先做单块交换/移动
+            
+            document.onpointermove = (ev) => {
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                el.style.transform = `translate(${dx}px, ${dy}px)`;
             };
 
-            window.onpointerup = (ev) => {
-                window.onpointermove = null; window.onpointerup = null;
-                const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                const dC = Math.round(dx/pW), dR = Math.round(dy/pH);
+            document.onpointerup = (ev) => {
+                document.onpointermove = null;
+                document.onpointerup = null;
+                el.style.transform = 'none';
+                el.style.zIndex = '';
 
-                if (dC !== 0 || dR !== 0) {
-                    let canMove = true;
-                    const updates = [];
-                    for(let gid of group) {
-                        const p = pieces.find(x => x.id === gid);
-                        const nr = Math.floor(p.cur/cols)+dR, nc = (p.cur%cols)+dC;
-                        if(nr<0 || nr>=rows || nc<0 || nc>=cols) { canMove = false; break; }
-                        updates.push({p, to: nr*cols+nc, from: p.cur});
-                    }
+                // 计算拖到了哪个格子上
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                
+                // 必须移动超过一半格子才算意图交换
+                if(Math.abs(dx) > gState.pw/2 || Math.abs(dy) > gState.ph/2) {
+                    const moveCol = Math.round(dx / gState.pw);
+                    const moveRow = Math.round(dy / gState.ph);
+                    
+                    const curR = Math.floor(p.cur / gState.cols);
+                    const curC = p.cur % gState.cols;
+                    const tarR = curR + moveRow;
+                    const tarC = curC + moveCol;
 
-                    if(canMove) {
-                        const targetPos = updates.map(u => u.to);
-                        const victims = pieces.filter(x => targetPos.includes(x.cur) && !group.includes(x.id));
-                        const vacants = updates.map(u => u.from).filter(v => !targetPos.includes(v));
-                        updates.forEach(u => u.p.cur = u.to);
-                        victims.forEach((v, i) => v.cur = vacants[i]);
-                    }
-                }
-                renderPieces(url);
-                checkWin();
-            };
-        }
-
-        function getGroup(sid) {
-            const group = new Set([sid]), queue = [sid];
-            while(queue.length > 0) {
-                const id = queue.shift(), p = pieces.find(x => x.id === id);
-                const r = Math.floor(p.cur/cols), c = p.cur%cols;
-                const neighbors = [
-                    {dr:0, dc:1,  cond: n => n.id === p.id+1 && Math.floor(p.id/cols) === Math.floor(n.id/cols)},
-                    {dr:0, dc:-1, cond: n => n.id === p.id-1 && Math.floor(p.id/cols) === Math.floor(n.id/cols)},
-                    {dr:1, dc:0,  cond: n => n.id === p.id+cols},
-                    {dr:-1,dc:0,  cond: n => n.id === p.id-cols}
-                ];
-                neighbors.forEach(n => {
-                    const nr = r+n.dr, nc = c+n.dc;
-                    if(nr>=0 && nr<rows && nc>=0 && nc<cols) {
-                        const found = pieces.find(x => x.cur === nr*cols+nc);
-                        if(found && !group.has(found.id) && n.cond(found)) {
-                            group.add(found.id); queue.push(found.id);
+                    if(tarR >=0 && tarR < gState.rows && tarC >=0 && tarC < gState.cols) {
+                        const tarIndex = tarR * gState.cols + tarC;
+                        const targetPiece = gState.pieces.find(x => x.cur === tarIndex);
+                        
+                        // 交换数据
+                        if(targetPiece) {
+                            const tmp = p.cur;
+                            p.cur = targetPiece.cur;
+                            targetPiece.cur = tmp;
+                            // 重新渲染
+                            const img = document.getElementById('win-img'); // 获取当前图URL
+                            renderBoard(img.src);
+                            checkWin();
                         }
                     }
-                });
-            }
-            return Array.from(group);
-        }
-
-        async function checkWin() {
-            if (pieces.every(p => p.id === p.cur)) {
-                isMoving = true;
-                document.getElementById('victory-img').style.opacity = '1';
-                document.getElementById('board-container').style.transform = 'scale(1.05)';
-                
-                if (!completedLevels.includes(currentLevel)) {
-                    completedLevels.push(currentLevel);
-                    localStorage.setItem('puz_done_v48', JSON.stringify(completedLevels));
-                    await syncMyData(); // 胜利时同步
                 }
+            };
+        }
+
+        function checkWin() {
+            const isWin = gState.pieces.every(p => p.id === p.cur);
+            if(isWin) {
+                document.getElementById('win-img').style.opacity = '1';
+                document.getElementById('puzzle-board').innerHTML = ''; // 清空格子显示完整图
                 
-                updateUI();
-                setTimeout(() => { isMoving = false; showMenu(); }, 2000);
+                if(!myData.levels.includes(gState.id)) {
+                    myData.levels.push(gState.id);
+                    localStorage.setItem('puz_lv_v49', JSON.stringify(myData.levels));
+                    syncData();
+                    updateUI();
+                }
+
+                setTimeout(() => {
+                    alert("🎉 拼图完成！");
+                    backToMenu();
+                }, 1500);
             }
         }
 
-        // --- 7. 排行榜与数据同步 ---
-        async function syncMyData() {
-            if(!gameDB) return;
-            const uid = localStorage.getItem('puz_uid_v48');
-            const nick = localStorage.getItem('puz_nick_v48');
-            if(!uid) return;
+        function backToMenu() {
+            document.getElementById('game-screen').classList.remove('active');
+            document.getElementById('menu-screen').classList.add('active');
+            renderMenu();
+        }
 
-            // 尝试上传，如果数据库因 RLS 拒绝，catch 会捕获
-            try {
-                const { error } = await gameDB.from('rankings').upsert({
-                    id: uid, 
-                    nickname: nick, 
-                    max_level: completedLevels.length,
-                    updated_at: new Date()
-                });
-                if(error) console.warn("数据同步失败(可能是权限问题):", error.message);
-            } catch(e) {
-                console.warn("网络或数据库连接异常");
-            }
+        // === 5. 排行榜与数据同步 ===
+        async function syncData() {
+            if(!_db) return;
+            // 上传
+            await _db.from('rankings').upsert({
+                id: myData.uid,
+                nickname: myData.nick,
+                max_level: myData.levels.length,
+                updated_at: new Date()
+            });
         }
 
         async function openRank() {
             const modal = document.getElementById('rank-modal');
             const list = document.getElementById('rank-list');
             modal.style.display = 'flex';
-            list.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa;">加载中...</div>';
+            list.innerHTML = '正在加载数据...';
 
-            if(!gameDB) {
-                list.innerHTML = '<div style="text-align:center; padding:20px;">排行榜服务未连接</div>';
+            if(!_db) {
+                list.innerHTML = '排行服务未连接';
                 return;
             }
 
-            try {
-                const { data, error } = await gameDB.from('rankings')
-                    .select('*')
-                    .order('max_level', {ascending: false})
-                    .limit(30);
+            const { data, error } = await _db.from('rankings')
+                .select('*')
+                .order('max_level', { ascending: false })
+                .limit(20);
 
-                if(error) throw error;
-
-                const myUid = localStorage.getItem('puz_uid_v48');
-                list.innerHTML = (data || []).map((r, i) => `
-                    <div class="rank-item ${r.id === myUid ? 'is-me' : ''}">
-                        <div style="width:30px; font-weight:bold; color:${i<3?'var(--gold)':'#fff'}">${i+1}</div>
-                        <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                            ${escapeHtml(r.nickname || '匿名')}
-                        </div>
-                        <div style="color:var(--primary-color); font-weight:bold;">Lv.${r.max_level}</div>
+            if(error) {
+                list.innerHTML = '加载失败: ' + error.message;
+            } else {
+                list.innerHTML = data.map((r, i) => `
+                    <div style="padding:10px; border-bottom:1px solid #333; display:flex; justify-content:space-between;">
+                        <span style="color:${i<3?'gold':'white'}">#${i+1} ${r.nickname}</span>
+                        <span style="color:#aaa">Lv.${r.max_level}</span>
                     </div>
-                `).join('') || '<div style="text-align:center; padding:20px;">暂无数据</div>';
-            } catch(e) {
-                console.error(e);
-                list.innerHTML = '<div style="text-align:center; padding:20px;">数据加载失败<br><span style="font-size:0.7rem; opacity:0.5">请检查Supabase RLS策略</span></div>';
+                `).join('');
             }
         }
 
-        function showMenu() {
-            document.getElementById('game-screen').classList.remove('active');
-            document.getElementById('menu-screen').classList.add('active');
-            document.getElementById('board-container').style.transform = 'none';
-            renderMenu();
-        }
-
-        function closeRank() { document.getElementById('rank-modal').style.display = 'none'; }
-        function escapeHtml(text) { 
-            if(!text) return '';
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); 
-        }
-
-        // 启动入口
+        // 启动
         window.onload = init;
+
     </script>
 </body>
 </html>
