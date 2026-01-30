@@ -3,324 +3,321 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图大师 - v4.6 云端修复版</title>
+    <title>拼图大师 v4.7 - 逻辑全回归版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --primary-color: #4a90e2;
-            --bg-dark: #0f0f1e;
-            --card-bg: rgba(255, 255, 255, 0.05);
-            --gold: #f1c40f;
-            --success-green: #2ecc71;
-        }
-
-        body {
-            font-family: 'PingFang SC', sans-serif;
-            background-color: var(--bg-dark); color: white; margin: 0; 
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center; 
-            overflow-x: hidden; -webkit-overflow-scrolling: touch;
-        }
-
-        /* --- 顶部栏 --- */
-        #user-bar {
-            width: 100%; max-width: 1000px; padding: 15px 20px; box-sizing: border-box;
-            display: flex; justify-content: space-between; align-items: center;
-            background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .user-avatar { width: 32px; height: 32px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-
-        /* --- 弹窗与遮罩 --- */
-        .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 3000;
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            backdrop-filter: blur(15px); padding: 20px; box-sizing: border-box;
-        }
-
-        #auth-modal .modal-content {
-            background: #1a1a2e; padding: 30px; border-radius: 12px; border: 1px solid var(--primary-color);
-            width: 90%; max-width: 350px; text-align: center;
-        }
-        #auth-modal input {
-            width: 100%; padding: 12px; margin: 20px 0; border-radius: 6px; border: 1px solid #333;
-            background: #0f0f1e; color: white; box-sizing: border-box; text-align: center;
-        }
-
-        /* --- 排行榜 --- */
-        #rank-modal .rank-container { width: 100%; max-width: 500px; height: 60vh; overflow-y: auto; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px; }
-        .rank-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .rank-item.is-me { color: var(--success-green); border: 1px solid rgba(46, 204, 113, 0.4); background: rgba(46, 204, 113, 0.1); border-radius: 10px; }
-
-        /* --- 游戏主界面 --- */
-        .screen { display: none; width: 100%; max-width: 1000px; padding: 20px; box-sizing: border-box; }
-        .active { display: flex; flex-direction: column; align-items: center; }
-
-        #level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 15px; width: 100%; }
-        .level-card { background: var(--card-bg); border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1); }
-        .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a2e; }
-        .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        :root { --primary: #4a90e2; --bg: #0f0f1e; --gold: #f1c40f; --lock: #555; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; align-items: center; overflow: hidden; touch-action: none; }
         
-        #board-container { padding: 10px; background: #1a1a2e; border-radius: 8px; position: relative; }
-        #puzzle-board { display: grid; position: relative; background: #000; overflow: hidden; }
-        .piece { box-sizing: border-box; background-repeat: no-repeat; border: 1px solid rgba(255, 255, 255, 0.1); touch-action: none; position: relative; }
-        
-        #victory-overlay { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            object-fit: cover; opacity: 0; z-index: 50; pointer-events: none; transition: opacity 0.5s; 
-        }
+        /* 顶部栏 */
+        #user-bar { width: 100%; max-width: 600px; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; background: rgba(255,255,255,0.05); }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        .avatar { width: 30px; height: 30px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
 
-        .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: #333; color: white; font-weight: bold; }
-        #rank-btn { background: rgba(241, 196, 15, 0.15); color: var(--gold); border: 1px solid var(--gold); }
+        /* 菜单与卡片 */
+        .screen { display: none; width: 100%; max-width: 600px; height: 85vh; overflow-y: auto; padding: 20px; box-sizing: border-box; }
+        .active { display: flex; flex-direction: column; }
+        #level-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .card { background: rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; position: relative; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); }
+        .card img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+        .card-info { padding: 8px; text-align: center; font-size: 0.8rem; }
+        .card.locked { opacity: 0.5; filter: grayscale(1); }
+
+        /* 游戏区域 */
+        #board-container { position: relative; background: #000; margin: 20px auto; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); overflow: hidden; }
+        #puzzle-board { position: relative; width: 100%; height: 100%; }
+        .piece { position: absolute; box-sizing: border-box; border: 0.5px solid rgba(255,255,255,0.1); background-repeat: no-repeat; transition: transform 0.1s linear, z-index 0s; }
+        #victory-img { position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; z-index: 1000; transition: opacity 0.5s, transform 1.5s ease-in-out; pointer-events: none; }
+
+        /* 弹窗样式 */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 5000; display: none; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .modal { background: #1a1a2e; padding: 30px; border-radius: 15px; text-align: center; width: 80%; max-width: 350px; }
+        input { width: 100%; padding: 12px; margin: 15px 0; border-radius: 8px; border: 1px solid #333; background: #000; color: #fff; text-align: center; }
+        .btn { padding: 10px 25px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin: 5px; }
+        .btn-p { background: var(--primary); color: white; }
+        #preview-box img { max-width: 90%; max-height: 60vh; border-radius: 8px; margin-bottom: 20px; border: 2px solid var(--primary); }
     </style>
 </head>
 <body>
 
-    <div id="auth-modal" class="overlay">
-        <div class="modal-content">
-            <h2>🌍 开启同步之旅</h2>
-            <p style="opacity: 0.6; font-size: 0.8rem;">设置昵称以保存云端进度</p>
-            <input type="text" id="nickname-input" placeholder="输入昵称..." maxlength="8">
-            <button class="btn" style="width: 100%; background: var(--primary-color);" onclick="registerUser()">开始游戏</button>
-        </div>
-    </div>
-
-    <div id="rank-modal" class="overlay">
-        <h2 style="color:var(--gold)">🏆 全球榜单</h2>
-        <div class="rank-container" id="rank-list"></div>
-        <button class="btn" style="margin-top: 20px; width: 180px;" onclick="closeRank()">返回</button>
-    </div>
-
     <div id="user-bar">
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="user-avatar" id="user-initial">?</div>
+        <div class="user-info">
+            <div class="avatar" id="u-init">?</div>
             <div>
-                <div id="user-name" style="font-weight: bold; font-size: 0.9rem;">游客</div>
-                <div id="user-stat" style="font-size: 0.7rem; opacity: 0.5;">Lv.0</div>
+                <div id="u-name" style="font-size:0.9rem">加载中...</div>
+                <div id="u-lv" style="font-size:0.7rem; opacity:0.6">Lv.0</div>
             </div>
         </div>
-        <button class="btn" id="rank-btn" onclick="openRank()">🏆 排行榜</button>
+        <button class="btn" style="background:var(--gold); color:#000; padding:5px 15px" onclick="toggleRank(true)">🏆 榜单</button>
     </div>
 
     <div id="menu-screen" class="screen active">
-        <h1 style="margin: 20px 0;">🧩 拼图大师 <span style="font-size: 0.8rem; opacity: 0.3;">v4.6</span></h1>
+        <h2 style="text-align:center">🧩 拼图大本营</h2>
         <div id="level-grid"></div>
     </div>
 
     <div id="game-screen" class="screen">
-        <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <button class="btn" onclick="showMenu()">← 菜单</button>
-            <h2 id="game-title" style="margin:0;">Level</h2>
-            <div id="diff-label" style="font-size: 0.8rem; opacity: 0.6;">难度: 3x3</div>
+        <div style="display:flex; justify-content:space-between; align-items:center">
+            <button class="btn" onclick="exitGame()">← 退出</button>
+            <h3 id="cur-lv-title">Level 1</h3>
+            <span id="cur-diff" style="opacity:0.5">3x3</span>
         </div>
         <div id="board-container">
-            <div id="puzzle-board">
-                <img id="victory-overlay" src="">
+            <div id="puzzle-board"></div>
+            <img id="victory-img" src="">
+        </div>
+    </div>
+
+    <div id="preview-overlay" class="overlay">
+        <div id="preview-box" style="text-align:center">
+            <img id="p-img" src="">
+            <div>
+                <button class="btn" onclick="togglePreview(false)">关闭</button>
+                <button class="btn btn-p" id="p-replay">再次挑战</button>
             </div>
         </div>
     </div>
 
+    <div id="auth-modal" class="overlay">
+        <div class="modal">
+            <h3>🌍 全球挑战进度同步</h3>
+            <input type="text" id="nick-in" placeholder="输入响亮的昵称" maxlength="8">
+            <button class="btn btn-p" style="width:100%" onclick="handleReg()">开始冒险</button>
+        </div>
+    </div>
+
+    <div id="rank-modal" class="overlay">
+        <div class="modal" style="max-width:400px; height:60vh; overflow-y:auto">
+            <h3 style="color:var(--gold)">🏆 全球英雄榜</h3>
+            <div id="rank-list"></div>
+            <button class="btn" onclick="toggleRank(false)" style="margin-top:20px">返回</button>
+        </div>
+    </div>
+
     <script>
-        // --- 请替换为您在 Supabase 项目中获取的真实信息 ---
+        // --- 配置区 ---
         const SUPABASE_URL = 'https://afdnvaysvwdmbnxklogt.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE';
-        
-        // 关键修复：改名为 _db 避免与库名冲突
         const _db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let levelData = [], completedLevels = JSON.parse(localStorage.getItem('puz_comp_v31') || '[]');
-        let currentImgUrl = '', currentLevelId = 1, rows, cols, pWidth, pHeight;
-        let pieces = [], isVictory = false;
+        let completed = JSON.parse(localStorage.getItem('puz_comp_v47') || '[]');
+        let currentL = 1, rows = 3, cols = 3, pieces = [], isWin = false;
+        let boardSize = Math.min(window.innerWidth - 40, 500);
 
-        const DataService = {
-            async getUser() {
-                return localStorage.getItem('puz_user_id') ? { nick: localStorage.getItem('puz_nickname') } : null;
-            },
-            async saveUser(nick) {
+        // --- 数据云同步 ---
+        const Cloud = {
+            async save(nick) {
                 const { data, error } = await _db.from('rankings').insert([{ nickname: nick, max_level: 0 }]).select();
-                if (error) return { id: 'temp_'+Date.now(), nickname: nick };
-                localStorage.setItem('puz_user_id', data[0].id);
-                localStorage.setItem('puz_nickname', data[0].nickname);
-                return data[0];
+                if(!error) { localStorage.setItem('puz_uid', data[0].id); localStorage.setItem('puz_nick', data[0].nickname); }
+                return data ? data[0] : { nickname: nick };
             },
-            async submitScore(level) {
-                const id = localStorage.getItem('puz_user_id');
-                if (!id || id.startsWith('temp_')) return;
-                await _db.from('rankings').update({ max_level: level, updated_at: new Date() }).eq('id', id);
+            async updateScore(lv) {
+                const uid = localStorage.getItem('puz_uid');
+                if (uid) await _db.from('rankings').update({ max_level: lv }).eq('id', uid);
             },
-            async getRankings() {
+            async getRanks() {
                 const { data } = await _db.from('rankings').select('*').order('max_level', { ascending: false }).limit(20);
-                // 容错：如果数据库为空，显示本地进度
-                if (!data || data.length === 0) {
-                    return [{ nickname: localStorage.getItem('puz_nickname') || "我", max_level: completedLevels.length, isMe: true }];
-                }
-                const myId = localStorage.getItem('puz_user_id');
-                return data.map(r => ({ ...r, isMe: r.id === myId }));
+                return data || [];
             }
         };
 
+        // --- 核心游戏逻辑 ---
         async function init() {
-            const user = await DataService.getUser();
-            if (!user) document.getElementById('auth-modal').style.display = 'flex';
-            else { updateUserUI(user.nick); discoverLevels(); }
+            const nick = localStorage.getItem('puz_nick');
+            if(!nick) document.getElementById('auth-modal').style.display='flex';
+            else { updateUI(); renderMenu(); }
         }
 
-        async function registerUser() {
-            const input = document.getElementById('nickname-input');
-            const user = await DataService.saveUser(input.value.trim() || "玩家");
-            document.getElementById('auth-modal').style.display = 'none';
-            updateUserUI(user.nickname); discoverLevels();
+        async function handleReg() {
+            const n = document.getElementById('nick-in').value.trim() || "挑战者";
+            await Cloud.save(n);
+            document.getElementById('auth-modal').style.display='none';
+            init();
         }
 
-        function updateUserUI(nick) {
-            document.getElementById('user-name').innerText = nick;
-            document.getElementById('user-initial').innerText = nick[0].toUpperCase();
-            const maxL = completedLevels.length > 0 ? Math.max(...completedLevels) : 0;
-            document.getElementById('user-stat').innerText = `Lv.${maxL}`;
-        }
-
-        async function openRank() {
-            const list = document.getElementById('rank-list');
-            list.innerHTML = '<p style="text-align:center">正在加载云端英雄榜...</p>';
-            document.getElementById('rank-modal').style.display = 'flex';
-            const rankings = await DataService.getRankings();
-            list.innerHTML = '';
-            rankings.forEach((r, i) => {
-                const item = document.createElement('div');
-                item.className = `rank-item ${r.isMe ? 'is-me' : ''}`;
-                item.innerHTML = `<div style="width:30px">${i+1}</div><div style="flex:1">${r.nickname}</div><div>Lv.${r.max_level}</div>`;
-                list.appendChild(item);
-            });
-        }
-
-        function closeRank() { document.getElementById('rank-modal').style.display = 'none'; }
-
-        async function discoverLevels() {
-            const currentMax = completedLevels.length > 0 ? Math.max(...completedLevels) : 0;
-            for(let i=1; i<=currentMax+5; i++) {
-                if(!levelData.find(l=>l.id===i)) {
-                    const url = await findImage(i);
-                    if(url) levelData.push({id:i, url});
-                }
-            }
-            renderMenu();
-        }
-
-        async function findImage(id) {
-            for (let ext of ['.jpg', '.png', '.webp']) {
-                const url = `${id}${ext}`;
-                const ok = await new Promise(r => { const img = new Image(); img.onload=()=>r(true); img.onerror=()=>r(false); img.src=url; });
-                if(ok) return url;
-            }
-            return null;
+        function updateUI() {
+            const nick = localStorage.getItem('puz_nick') || "游客";
+            document.getElementById('u-name').innerText = nick;
+            document.getElementById('u-init').innerText = nick[0];
+            document.getElementById('u-lv').innerText = `Lv.${completed.length}`;
         }
 
         function renderMenu() {
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
-            levelData.forEach(l => {
-                const isDone = completedLevels.includes(l.id);
-                const isLock = l.id > 1 && !completedLevels.includes(l.id-1);
-                const card = document.createElement('div');
-                card.className = 'level-card';
-                if(isLock) card.style.opacity = '0.3';
-                card.innerHTML = `<div class="card-thumb">${isDone?`<img src="${l.url}">`:l.id}</div><div style="text-align:center;font-size:0.6rem;padding:5px">${isDone?'已达成':'待挑战'}</div>`;
-                if(!isLock) card.onclick = () => startLevel(l.id);
-                grid.appendChild(card);
-            });
-        }
-
-        function startLevel(id) {
-            isVictory = false; currentLevelId = id;
-            const l = levelData.find(x=>x.id===id);
-            currentImgUrl = l.url;
-            
-            // 关键修复：确保 ID 存在
-            const overlay = document.getElementById('victory-overlay');
-            overlay.src = l.url; overlay.style.opacity = '0';
-
-            const img = new Image(); img.src = l.url;
-            img.onload = () => {
-                rows = 3; cols = 3;
-                pWidth = Math.min(window.innerWidth*0.8, 400)/cols;
-                pHeight = (pWidth*cols * (img.height/img.width))/rows;
-                initBoard();
-                document.getElementById('menu-screen').classList.remove('active');
-                document.getElementById('game-screen').classList.add('active');
-                document.getElementById('game-title').innerText = `Level ${id}`;
-            };
-        }
-
-        function initBoard() {
-            pieces = [];
-            for(let i=0; i<rows*cols; i++) pieces.push({id:i, currentPos:i, bgX:(i%cols)*pWidth, bgY:Math.floor(i/cols)*pHeight});
-            let pool = [...Array(rows*cols).keys()].sort(()=>Math.random()-0.5);
-            pieces.forEach((p,i)=>p.currentPos=pool[i]);
-            renderPieces();
-        }
-
-        function renderPieces() {
-            const board = document.getElementById('puzzle-board');
-            const overlay = document.getElementById('victory-overlay');
-            board.innerHTML = ''; board.appendChild(overlay);
-            board.style.width = `${pWidth*cols}px`;
-            board.style.gridTemplateColumns = `repeat(${cols}, ${pWidth}px)`;
-
-            pieces.sort((a,b)=>a.currentPos-b.currentPos).forEach(p => {
-                const div = document.createElement('div');
-                div.className = 'piece'; div.style.width=`${pWidth}px`; div.style.height=`${pHeight}px`;
-                div.style.backgroundImage=`url(${currentImgUrl})`;
-                div.style.backgroundPosition=`-${p.bgX}px -${p.bgY}px`;
-                div.style.backgroundSize=`${pWidth*cols}px ${pHeight*rows}px`;
-                div.onpointerdown = e => handleDrag(e, p.id);
-                board.appendChild(div);
-            });
-        }
-
-        function handleDrag(e, id) {
-            if(isVictory) return;
-            const startX = e.clientX, startY = e.clientY;
-            const p = pieces.find(x=>x.id===id);
-            const originalPos = p.currentPos;
-            
-            window.onpointermove = ev => {
-                const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                const el = document.querySelector(`[style*="background-position: -${p.bgX}px"]`);
-                if(el) el.style.transform = `translate(${dx}px, ${dy}px)`;
-                if(el) el.style.zIndex = "100";
-            };
-
-            window.onpointerup = ev => {
-                window.onpointermove = null;
-                const dx = ev.clientX - startX, dy = ev.clientY - startY;
-                const dC = Math.round(dx/pWidth), dR = Math.round(dy/pHeight);
-                const targetPos = originalPos + dR*cols + dC;
-                
-                if(targetPos >= 0 && targetPos < rows*cols && targetPos !== originalPos) {
-                    const victim = pieces.find(x=>x.currentPos === targetPos);
-                    if(victim) { p.currentPos = targetPos; victim.currentPos = originalPos; }
-                }
-                renderPieces(); checkWin();
-            };
-        }
-
-        async function checkWin() {
-            if (pieces.every(p => p.id === p.currentPos)) {
-                isVictory = true;
-                document.getElementById('victory-overlay').style.opacity = '1';
-                if(!completedLevels.includes(currentLevelId)) {
-                    completedLevels.push(currentLevelId);
-                    localStorage.setItem('puz_comp_v31', JSON.stringify(completedLevels));
-                    await DataService.submitScore(Math.max(...completedLevels));
-                }
-                setTimeout(() => { alert('关卡完成！'); showMenu(); }, 600);
+            for(let i=1; i<=Math.max(completed.length+3, 15); i++) {
+                const isDone = completed.includes(i);
+                const isLocked = i > 1 && !completed.includes(i-1);
+                const el = document.createElement('div');
+                el.className = `card ${isLocked ? 'locked' : ''}`;
+                el.innerHTML = `
+                    <img src="${i}.jpg" onerror="this.src='https://via.placeholder.com/150?text=${i}'">
+                    <div class="card-info">${isDone ? '✅ 已完成' : (isLocked ? '🔒 未解锁' : '🔥 挑战中')}</div>
+                `;
+                el.onclick = () => {
+                    if (isLocked) return;
+                    if (isDone) showPreview(i);
+                    else startLevel(i);
+                };
+                grid.appendChild(el);
             }
         }
 
-        function showMenu() {
-            document.getElementById('game-screen').classList.remove('active');
-            document.getElementById('menu-screen').classList.add('active');
-            updateUserUI(localStorage.getItem('puz_nickname'));
-            discoverLevels();
+        function showPreview(id) {
+            document.getElementById('p-img').src = `${id}.jpg`;
+            document.getElementById('p-replay').onclick = () => { togglePreview(false); startLevel(id); };
+            togglePreview(true);
+        }
+
+        function startLevel(id) {
+            currentL = id; isWin = false;
+            rows = 3; cols = 3; // 动态难度可后续加
+            const board = document.getElementById('puzzle-board');
+            const vImg = document.getElementById('victory-img');
+            board.innerHTML = ''; 
+            vImg.src = `${id}.jpg`; vImg.style.opacity = '0'; vImg.style.transform = 'scale(1)';
+            board.appendChild(vImg);
+
+            const img = new Image(); img.src = `${id}.jpg`;
+            img.onload = () => {
+                const ratio = img.height / img.width;
+                const h = boardSize * ratio;
+                document.getElementById('board-container').style.width = boardSize + 'px';
+                document.getElementById('board-container').style.height = h + 'px';
+                
+                const pw = boardSize / cols, ph = h / rows;
+                pieces = [];
+                for(let r=0; r<rows; r++) {
+                    for(let c=0; c<cols; c++) {
+                        const p = {
+                            id: r*cols + c,
+                            x: Math.random() * (boardSize - pw),
+                            y: Math.random() * (h - ph),
+                            tx: c * pw, ty: r * ph,
+                            group: [r*cols + c] // 融合编组初始只有自己
+                        };
+                        pieces.push(p);
+                        const div = document.createElement('div');
+                        div.className = 'piece'; div.id = `p-${p.id}`;
+                        div.style.width = pw + 'px'; div.style.height = ph + 'px';
+                        div.style.backgroundImage = `url(${id}.jpg)`;
+                        div.style.backgroundSize = `${boardSize}px ${h}px`;
+                        div.style.backgroundPosition = `-${p.tx}px -${p.ty}px`;
+                        div.style.transform = `translate(${p.x}px, ${p.y}px)`;
+                        div.onpointerdown = (e) => handleDrag(e, p.id);
+                        board.appendChild(div);
+                    }
+                }
+                document.getElementById('menu-screen').classList.remove('active');
+                document.getElementById('game-screen').classList.add('active');
+                document.getElementById('cur-lv-title').innerText = `Level ${id}`;
+            };
+        }
+
+        function handleDrag(e, id) {
+            if (isWin) return;
+            const p = pieces.find(x => x.id === id);
+            const groupPieces = pieces.filter(x => p.group.includes(x.id));
+            const offsets = groupPieces.map(x => ({ id: x.id, dx: x.x - e.clientX, dy: x.y - e.clientY }));
+            
+            groupPieces.forEach(x => {
+                const el = document.getElementById(`p-${x.id}`);
+                el.style.zIndex = "1000";
+                el.style.transition = "none";
+            });
+
+            window.onpointermove = (ev) => {
+                offsets.forEach(off => {
+                    const target = pieces.find(x => x.id === off.id);
+                    target.x = ev.clientX + off.dx;
+                    target.y = ev.clientY + off.dy;
+                    document.getElementById(`p-${off.id}`).style.transform = `translate(${target.x}px, ${target.y}px)`;
+                });
+            };
+
+            window.onpointerup = () => {
+                window.onpointermove = null;
+                checkFusion(p);
+                groupPieces.forEach(x => document.getElementById(`p-${x.id}`).style.zIndex = "10");
+                checkWin();
+            };
+        }
+
+        function checkFusion(p) {
+            const pw = boardSize / cols, ph = (boardSize * (rows/cols)) / rows;
+            const myGroup = pieces.filter(x => p.group.includes(x.id));
+
+            pieces.forEach(other => {
+                if (p.group.includes(other.id)) return;
+                
+                // 检查当前拖动组中的任意一块是否与非本组的某块对齐
+                myGroup.forEach(mine => {
+                    const diffX = (mine.x - other.x) - (mine.tx - other.tx);
+                    const diffY = (mine.y - other.y) - (mine.ty - other.ty);
+
+                    if (Math.abs(diffX) < 20 && Math.abs(diffY) < 20) {
+                        // 融合逻辑
+                        const newGroup = [...new Set([...p.group, ...other.group])];
+                        const offsetX = (other.x - other.tx);
+                        const offsetY = (other.y - other.ty);
+
+                        pieces.forEach(x => {
+                            if (newGroup.includes(x.id)) {
+                                x.group = newGroup;
+                                x.x = x.tx + offsetX;
+                                x.y = x.ty + offsetY;
+                                const el = document.getElementById(`p-${x.id}`);
+                                el.style.transition = "transform 0.2s";
+                                el.style.transform = `translate(${x.x}px, ${x.y}px)`;
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        async function checkWin() {
+            // 只要所有人都在同一个组，且与坐标原点偏差极小，即为胜利
+            const p0 = pieces[0];
+            const isAllOneGroup = pieces.every(x => x.group.length === pieces.length);
+            const offsetX = p0.x - p0.tx, offsetY = p0.y - p0.ty;
+            
+            // 即使没完全融合，如果所有位置都对了也算
+            const isAllMatch = pieces.every(x => Math.abs(x.x - x.tx - offsetX) < 5 && Math.abs(x.y - x.ty - offsetY) < 5);
+
+            if (isAllOneGroup || isAllMatch) {
+                isWin = true;
+                const vImg = document.getElementById('victory-img');
+                vImg.style.opacity = '1';
+                vImg.style.transform = 'scale(1.3)'; // 1.5s 内放大至 130%
+                
+                if(!completed.includes(currentL)) {
+                    completed.push(currentL);
+                    localStorage.setItem('puz_comp_v47', JSON.stringify(completed));
+                    await Cloud.updateScore(completed.length);
+                }
+
+                setTimeout(() => {
+                    startLevel(currentL + 1);
+                }, 1600); // 略大于 1.5s 后切换
+            }
+        }
+
+        // --- 辅助 UI 函数 ---
+        function exitGame() { document.getElementById('game-screen').classList.remove('active'); document.getElementById('menu-screen').classList.add('active'); renderMenu(); updateUI(); }
+        function togglePreview(s) { document.getElementById('preview-overlay').style.display = s ? 'flex' : 'none'; }
+        async function toggleRank(s) {
+            const m = document.getElementById('rank-modal');
+            m.style.display = s ? 'flex' : 'none';
+            if(s) {
+                const list = await Cloud.getRanks();
+                document.getElementById('rank-list').innerHTML = list.map((r,i) => `
+                    <div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #333">
+                        <span>${i+1}. ${r.nickname}</span>
+                        <span style="color:var(--gold)">Lv.${r.max_level}</span>
+                    </div>
+                `).join('');
+            }
         }
 
         init();
