@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图大师 - v4.9 稳定修复版</title>
+    <title>拼图大师 - v5.0 自动修复版</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -15,8 +15,7 @@
         body {
             font-family: sans-serif; background: var(--dark); color: white; margin: 0;
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
-            touch-action: none; /* 防止手机端下拉刷新干扰 */
-            overflow-x: hidden;
+            touch-action: none; overflow-x: hidden;
         }
 
         /* 顶部栏 */
@@ -44,15 +43,12 @@
         #game-area {
             position: relative; margin-top: 20px;
             transition: transform 0.3s;
-            /* 限制最大宽高，防止超出手机屏幕 */
-            max-width: 96vw; 
-            max-height: 75vh;
+            max-width: 96vw; max-height: 75vh;
             display: flex; justify-content: center; align-items: center;
         }
         #puzzle-board {
             position: relative; border: 2px solid #444; background: #000;
-            /* 默认隐藏，JS计算好尺寸后再显示 */
-            visibility: hidden; 
+            visibility: hidden; /* 计算好尺寸前隐藏 */
         }
         .piece {
             position: absolute; border: 1px solid rgba(255,255,255,0.3);
@@ -66,15 +62,14 @@
             aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
             cursor: pointer; position: relative; overflow: hidden;
         }
+        /* 缩略图也加上 onerror 处理 */
         .level-btn img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; opacity: 0.5; }
         .level-btn span { z-index: 2; font-weight: bold; text-shadow: 0 1px 3px black; }
 
-        /* 通用按钮 */
         .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; }
         .btn-gold { background: var(--gold); color: #000; }
         .btn-blue { background: var(--primary); color: #fff; }
 
-        /* 界面切换 */
         .screen { display: none; width: 100%; flex-direction: column; align-items: center; }
         .screen.active { display: flex; }
     </style>
@@ -128,48 +123,38 @@
     </div>
 
     <script>
-        // === 核心修复：变量名使用 _db 避免冲突 ===
+        // --- 核心配置 ---
         const SB_URL = 'https://afdnvaysvwdmbnxklogt.supabase.co';
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZG52YXlzdndkbWJueGtsb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NzQyNzMsImV4cCI6MjA4NTI1MDI3M30.KI1Mi3cNBwy1A0-Fx9V9DIITzgExyhQgLRGvEwDWFsE';
         
         let _db = null;
         try {
-            // 使用 window.supabase 确保调用的是全局对象
-            if(window.supabase) {
-                _db = window.supabase.createClient(SB_URL, SB_KEY);
-                console.log("数据库连接成功");
-            }
-        } catch(e) {
-            console.error("数据库初始化失败:", e);
-        }
+            if(window.supabase) _db = window.supabase.createClient(SB_URL, SB_KEY);
+        } catch(e) { console.error("DB Error:", e); }
 
-        // === 游戏数据 ===
         let myData = {
-            uid: localStorage.getItem('puz_uid_v49'),
-            nick: localStorage.getItem('puz_nick_v49'),
-            levels: JSON.parse(localStorage.getItem('puz_lv_v49') || '[]')
+            uid: localStorage.getItem('puz_uid_v50'),
+            nick: localStorage.getItem('puz_nick_v50'),
+            levels: JSON.parse(localStorage.getItem('puz_lv_v50') || '[]')
         };
 
-        // === 1. 初始化逻辑 ===
+        // --- 1. 初始化 ---
         function init() {
             if(myData.nick) {
                 document.getElementById('auth-modal').style.display = 'none';
                 updateUI();
                 renderMenu();
-                syncData(); // 后台同步
+                syncData();
             }
         }
 
         function startGame() {
             const val = document.getElementById('nick-input').value.trim();
             if(!val) return alert("起个名字吧！");
-            
-            // 生成新用户
             myData.nick = val;
             myData.uid = 'u_' + Date.now().toString(36);
-            localStorage.setItem('puz_nick_v49', myData.nick);
-            localStorage.setItem('puz_uid_v49', myData.uid);
-            
+            localStorage.setItem('puz_nick_v50', myData.nick);
+            localStorage.setItem('puz_uid_v50', myData.uid);
             document.getElementById('auth-modal').style.display = 'none';
             updateUI();
             renderMenu();
@@ -182,11 +167,10 @@
             document.getElementById('ui-lv').innerText = `已通过: ${myData.levels.length}关`;
         }
 
-        // === 2. 关卡菜单 ===
+        // --- 2. 关卡菜单 (修复缩略图加载失败) ---
         function renderMenu() {
             const list = document.getElementById('menu-view');
             list.innerHTML = '';
-            // 显示已完成 + 未来5关
             const maxShow = myData.levels.length + 5;
             
             for(let i=1; i<=maxShow; i++) {
@@ -196,61 +180,73 @@
                 const div = document.createElement('div');
                 div.className = 'level-btn';
                 div.style.opacity = isLock ? '0.3' : '1';
-                // 如果已完成，尝试显示缩略图，否则显示数字
-                div.innerHTML = isDone ? 
-                    `<img src="${i}.jpg"><span>✅ ${i}</span>` : 
-                    `<span>${isLock ? '🔒' : i}</span>`;
                 
-                if(!isLock) {
-                    div.onclick = () => loadLevel(i);
-                }
+                // 自动替补逻辑：如果本地图片加载失败，使用网络图
+                const backupUrl = `https://picsum.photos/200/200?random=${i}`;
+                
+                div.innerHTML = `
+                    ${isDone || !isLock ? 
+                        `<img src="${i}.jpg" onerror="this.src='${backupUrl}'">` : ''}
+                    <span>${isDone ? '✅' : (isLock ? '🔒' : i)}</span>
+                `;
+                
+                if(!isLock) div.onclick = () => loadLevel(i);
                 list.appendChild(div);
             }
         }
 
-        // === 3. 游戏核心 (修复适配问题) ===
+        // --- 3. 游戏加载核心 (修复图片报错无法进入) ---
         let gState = { id:0, pieces:[], rows:0, cols:0, pw:0, ph:0, moving:false };
 
         function loadLevel(id) {
             document.getElementById('menu-screen').classList.remove('active');
             document.getElementById('game-screen').classList.add('active');
-            document.getElementById('level-title').innerText = `Level ${id} 加载中...`;
+            document.getElementById('level-title').innerText = `加载中...`;
             document.getElementById('game-area').style.transform = 'none';
             document.getElementById('win-img').style.opacity = '0';
             
+            // 关键修复逻辑：
             const img = new Image();
-            img.src = `${id}.jpg`;
-            img.onload = () => {
-                startPuzzle(img, id);
-            };
+            img.crossOrigin = "Anonymous"; // 允许跨域，防止画布污染
+            
+            // 定义成功回调
+            img.onload = () => startPuzzle(img, id);
+            
+            // 定义失败回调：自动切换到网络图
             img.onerror = () => {
-                alert(`找不到图片 ${id}.jpg，请确保图片已上传`);
-                backToMenu();
+                console.warn(`本地图片 ${id}.jpg 未找到，切换到网络备份图`);
+                // 防止无限循环：如果是网络图也挂了，就终止
+                if(img.src.includes('picsum.photos')) {
+                    alert("网络图片加载失败，请检查网络连接");
+                    backToMenu();
+                    return;
+                }
+                // 使用 Picsum 提供的高清随机图，带上随机参数保证每关不一样
+                img.src = `https://picsum.photos/800/800?random=${id}`;
             };
+
+            // 1. 先尝试加载本地图片
+            img.src = `${id}.jpg`;
         }
 
         function startPuzzle(img, id) {
             gState.id = id;
             const ratio = img.width / img.height;
-            // 难度计算
             gState.cols = 3 + Math.floor((id-1)/3); 
             gState.rows = Math.round(gState.cols / ratio);
 
-            // --- 关键：自适应屏幕大小 ---
-            const screenW = window.innerWidth * 0.94; // 留出一点边距
+            // 适配屏幕
+            const screenW = window.innerWidth * 0.94;
             const screenH = window.innerHeight * 0.70;
 
-            // 1. 先按宽度算
             gState.pw = Math.floor(screenW / gState.cols);
             gState.ph = Math.floor(gState.pw / ratio);
 
-            // 2. 如果高度超了，就按高度反算
             if(gState.ph * gState.rows > screenH) {
                 gState.ph = Math.floor(screenH / gState.rows);
                 gState.pw = Math.floor(gState.ph * ratio);
             }
 
-            // 设置棋盘
             const board = document.getElementById('puzzle-board');
             board.style.width = (gState.pw * gState.cols) + 'px';
             board.style.height = (gState.ph * gState.rows) + 'px';
@@ -260,18 +256,16 @@
             document.getElementById('win-img').src = img.src;
             document.getElementById('level-title').innerText = `Level ${id}`;
 
-            // 生成碎片
             gState.pieces = [];
             for(let i=0; i < gState.rows * gState.cols; i++) {
                 gState.pieces.push({
-                    id: i, // 正确位置ID
-                    cur: i, // 当前位置ID
+                    id: i, cur: i,
                     x: (i % gState.cols) * gState.pw,
                     y: Math.floor(i / gState.cols) * gState.ph
                 });
             }
 
-            // 打乱 (Fisher-Yates)
+            // 打乱
             let indexes = gState.pieces.map(p => p.id);
             for(let i = indexes.length -1; i>0; i--){
                 const j = Math.floor(Math.random()*(i+1));
@@ -285,90 +279,54 @@
         function renderBoard(url) {
             const board = document.getElementById('puzzle-board');
             board.innerHTML = '';
-
             gState.pieces.forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'piece';
-                div.style.width = gState.pw + 'px';
-                div.style.height = gState.ph + 'px';
+                div.style.width = gState.pw + 'px'; div.style.height = gState.ph + 'px';
                 div.style.backgroundImage = `url(${url})`;
                 div.style.backgroundSize = `${gState.cols*gState.pw}px ${gState.rows*gState.ph}px`;
                 div.style.backgroundPosition = `-${p.x}px -${p.y}px`;
                 
-                // 计算当前它在棋盘的哪个格子里
-                const curRow = Math.floor(p.cur / gState.cols);
-                const curCol = p.cur % gState.cols;
-                div.style.left = (curCol * gState.pw) + 'px';
-                div.style.top = (curRow * gState.ph) + 'px';
+                const r = Math.floor(p.cur / gState.cols), c = p.cur % gState.cols;
+                div.style.left = (c * gState.pw) + 'px';
+                div.style.top = (r * gState.ph) + 'px';
                 
-                // 视觉融合：检查右边和下边是否是“正确邻居”
+                // 边框融合
                 const right = gState.pieces.find(x => x.cur === p.cur + 1);
                 const down = gState.pieces.find(x => x.cur === p.cur + gState.cols);
-                
-                // 如果右边有人，且那就是我原始的右边邻居 -> 隐藏右边框
-                if(curCol < gState.cols-1 && right && right.id === p.id + 1) {
-                    div.style.borderRight = 'none';
-                }
-                // 同理下方
-                if(curRow < gState.rows-1 && down && down.id === p.id + gState.cols) {
-                    div.style.borderBottom = 'none';
-                }
+                if(c < gState.cols-1 && right && right.id === p.id + 1) div.style.borderRight = 'none';
+                if(r < gState.rows-1 && down && down.id === p.id + gState.cols) div.style.borderBottom = 'none';
 
                 div.onpointerdown = (e) => handleTouch(e, p);
                 board.appendChild(div);
             });
         }
 
-        // === 4. 拖拽逻辑 ===
         function handleTouch(e, p) {
             if(gState.moving) return;
-            // 简单版本：点击只是高亮，或者实现交换？
-            // 这里实现拖拽交换
             const startX = e.clientX, startY = e.clientY;
             const el = e.target;
             el.style.zIndex = 100;
             
-            // 找到所有连通的块（这里简化为只拖当前块，复杂连通逻辑易出错，先保稳）
-            // 如果需要连通块逻辑，可复用之前版本，这里为了稳，先做单块交换/移动
-            
             document.onpointermove = (ev) => {
-                const dx = ev.clientX - startX;
-                const dy = ev.clientY - startY;
-                el.style.transform = `translate(${dx}px, ${dy}px)`;
+                el.style.transform = `translate(${ev.clientX - startX}px, ${ev.clientY - startY}px)`;
             };
 
             document.onpointerup = (ev) => {
-                document.onpointermove = null;
-                document.onpointerup = null;
-                el.style.transform = 'none';
-                el.style.zIndex = '';
-
-                // 计算拖到了哪个格子上
-                const dx = ev.clientX - startX;
-                const dy = ev.clientY - startY;
+                document.onpointermove = null; document.onpointerup = null;
+                el.style.transform = 'none'; el.style.zIndex = '';
                 
-                // 必须移动超过一半格子才算意图交换
+                const dx = ev.clientX - startX, dy = ev.clientY - startY;
                 if(Math.abs(dx) > gState.pw/2 || Math.abs(dy) > gState.ph/2) {
-                    const moveCol = Math.round(dx / gState.pw);
-                    const moveRow = Math.round(dy / gState.ph);
-                    
-                    const curR = Math.floor(p.cur / gState.cols);
-                    const curC = p.cur % gState.cols;
-                    const tarR = curR + moveRow;
-                    const tarC = curC + moveCol;
+                    const mC = Math.round(dx / gState.pw), mR = Math.round(dy / gState.ph);
+                    const cR = Math.floor(p.cur / gState.cols), cC = p.cur % gState.cols;
+                    const tR = cR + mR, tC = cC + mC;
 
-                    if(tarR >=0 && tarR < gState.rows && tarC >=0 && tarC < gState.cols) {
-                        const tarIndex = tarR * gState.cols + tarC;
-                        const targetPiece = gState.pieces.find(x => x.cur === tarIndex);
-                        
-                        // 交换数据
-                        if(targetPiece) {
-                            const tmp = p.cur;
-                            p.cur = targetPiece.cur;
-                            targetPiece.cur = tmp;
-                            // 重新渲染
-                            const img = document.getElementById('win-img'); // 获取当前图URL
-                            renderBoard(img.src);
+                    if(tR >=0 && tR < gState.rows && tC >=0 && tC < gState.cols) {
+                        const target = gState.pieces.find(x => x.cur === tR * gState.cols + tC);
+                        if(target) {
+                            [p.cur, target.cur] = [target.cur, p.cur];
+                            renderBoard(document.getElementById('win-img').src);
                             checkWin();
                         }
                     }
@@ -377,22 +335,16 @@
         }
 
         function checkWin() {
-            const isWin = gState.pieces.every(p => p.id === p.cur);
-            if(isWin) {
+            if(gState.pieces.every(p => p.id === p.cur)) {
                 document.getElementById('win-img').style.opacity = '1';
-                document.getElementById('puzzle-board').innerHTML = ''; // 清空格子显示完整图
-                
+                document.getElementById('puzzle-board').innerHTML = '';
                 if(!myData.levels.includes(gState.id)) {
                     myData.levels.push(gState.id);
-                    localStorage.setItem('puz_lv_v49', JSON.stringify(myData.levels));
+                    localStorage.setItem('puz_lv_v50', JSON.stringify(myData.levels));
                     syncData();
                     updateUI();
                 }
-
-                setTimeout(() => {
-                    alert("🎉 拼图完成！");
-                    backToMenu();
-                }, 1500);
+                setTimeout(() => { alert("🎉 拼图完成！"); backToMenu(); }, 1500);
             }
         }
 
@@ -402,49 +354,30 @@
             renderMenu();
         }
 
-        // === 5. 排行榜与数据同步 ===
         async function syncData() {
             if(!_db) return;
-            // 上传
             await _db.from('rankings').upsert({
-                id: myData.uid,
-                nickname: myData.nick,
-                max_level: myData.levels.length,
-                updated_at: new Date()
+                id: myData.uid, nickname: myData.nick,
+                max_level: myData.levels.length, updated_at: new Date()
             });
         }
 
         async function openRank() {
-            const modal = document.getElementById('rank-modal');
             const list = document.getElementById('rank-list');
-            modal.style.display = 'flex';
-            list.innerHTML = '正在加载数据...';
-
-            if(!_db) {
-                list.innerHTML = '排行服务未连接';
-                return;
-            }
-
-            const { data, error } = await _db.from('rankings')
-                .select('*')
-                .order('max_level', { ascending: false })
-                .limit(20);
-
-            if(error) {
-                list.innerHTML = '加载失败: ' + error.message;
-            } else {
-                list.innerHTML = data.map((r, i) => `
-                    <div style="padding:10px; border-bottom:1px solid #333; display:flex; justify-content:space-between;">
-                        <span style="color:${i<3?'gold':'white'}">#${i+1} ${r.nickname}</span>
-                        <span style="color:#aaa">Lv.${r.max_level}</span>
-                    </div>
-                `).join('');
-            }
+            document.getElementById('rank-modal').style.display = 'flex';
+            list.innerHTML = '加载中...';
+            if(!_db) return list.innerHTML = '未连接服务器';
+            
+            const { data } = await _db.from('rankings').select('*').order('max_level', {ascending:false}).limit(20);
+            list.innerHTML = (data||[]).map((r,i) => `
+                <div style="padding:10px; border-bottom:1px solid #333; display:flex; justify-content:space-between;">
+                    <span style="color:${i<3?'gold':'white'}">#${i+1} ${r.nickname}</span>
+                    <span style="color:#aaa">Lv.${r.max_level}</span>
+                </div>
+            `).join('') || '暂无数据';
         }
 
-        // 启动
         window.onload = init;
-
     </script>
 </body>
 </html>
