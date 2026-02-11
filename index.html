@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图大师 - v4.2 实时数据版</title>
+    <title>拼图大师 - v4.2 极速版</title>
     <style>
         :root {
             --primary-color: #4a90e2;
@@ -23,16 +23,19 @@
 
         /* --- 顶部用户信息栏 --- */
         #user-bar {
-            width: 100%; max-width: 1000px; padding: 15px 20px; box-sizing: border-box;
+            width: 100%;
+            max-width: 1000px; padding: 15px 20px; box-sizing: border-box;
             display: flex; justify-content: space-between; align-items: center;
             background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .user-info { display: flex; align-items: center; gap: 10px; }
-        .user-avatar { width: 32px; height: 32px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .user-avatar { width: 32px; height: 32px; background: var(--primary-color); border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-weight: bold; }
 
         /* --- 全屏遮罩通用样式 --- */
         .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 3000;
             display: none; flex-direction: column; align-items: center; justify-content: center;
             backdrop-filter: blur(15px); padding: 20px; box-sizing: border-box;
@@ -40,20 +43,25 @@
 
         /* --- 注册弹窗 --- */
         #auth-modal .modal-content {
-            background: #1a1a2e; padding: 30px; border-radius: 12px; border: 1px solid var(--primary-color);
+            background: #1a1a2e;
+            padding: 30px; border-radius: 12px; border: 1px solid var(--primary-color);
             width: 90%; max-width: 350px; text-align: center;
         }
         #auth-modal input {
-            width: 100%; padding: 12px; margin: 20px 0; border-radius: 6px; border: 1px solid #333;
-            background: #0f0f1e; color: white; box-sizing: border-box; text-align: center; font-size: 1rem;
+            width: 100%;
+            padding: 12px; margin: 20px 0; border-radius: 6px; border: 1px solid #333;
+            background: #0f0f1e; color: white; box-sizing: border-box; text-align: center;
+            font-size: 1rem;
         }
 
         /* --- 排行榜 --- */
         #rank-modal .rank-container {
-            width: 100%; max-width: 500px; height: 60vh; overflow-y: auto;
+            width: 100%;
+            max-width: 500px; height: 60vh; overflow-y: auto;
             background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px;
         }
-        .rank-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); transition: 0.3s; }
+        .rank-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: 0.3s; }
         .rank-num { width: 40px; font-weight: bold; color: var(--silver-grey); }
         .rank-item.top3 .rank-num { color: var(--gold); font-size: 1.2rem; }
         .rank-name { flex: 1; }
@@ -71,32 +79,49 @@
         .rank-item.is-me .rank-num, .rank-item.is-me .rank-val { color: var(--success-green) !important; }
 
         /* --- 关卡预览 --- */
-        #preview-img { max-width: 90%; max-height: 70%; border-radius: 8px; border: 1px solid #444; }
+        #preview-img { max-width: 90%;
+            max-height: 70%; border-radius: 8px; border: 1px solid #444; }
 
         /* --- 游戏主界面 --- */
-        .screen { display: none; width: 100%; max-width: 1000px; padding: 20px; animation: fadeIn 0.3s; box-sizing: border-box; }
+        .screen { display: none;
+            width: 100%; max-width: 1000px; padding: 20px; animation: fadeIn 0.3s; box-sizing: border-box;
+        }
         .active { display: flex; flex-direction: column; align-items: center; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        #level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; width: 100%; margin-top: 20px; padding-bottom: 50px; }
-        .level-card { background: var(--card-bg); border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1); }
-        .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a2e; font-size: 2.5rem; font-weight: bold; }
-        .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        #level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px;
+            width: 100%; margin-top: 20px; padding-bottom: 50px; }
+        .level-card { background: var(--card-bg); border-radius: 8px;
+            overflow: hidden; cursor: pointer; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card-thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+            background: #1a1a2e; font-size: 2.5rem; font-weight: bold; }
+        .card-thumb img { width: 100%;
+            height: 100%; object-fit: cover; }
         
-        #board-container { padding: 10px; background: #1a1a2e; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 10; position: relative; }
-        .piece { box-sizing: border-box; background-repeat: no-repeat; border: 1px solid rgba(255, 255, 255, 0.2); touch-action: none; }
+        #board-container { padding: 10px;
+            background: #1a1a2e; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 10; position: relative;
+        }
+        .piece { box-sizing: border-box; background-repeat: no-repeat;
+            border: 1px solid rgba(255, 255, 255, 0.2); touch-action: none; }
         .no-border-right { border-right-color: transparent !important; }
         .no-border-bottom { border-bottom-color: transparent !important; }
         .no-border-left { border-left-color: transparent !important; }
         .no-border-top { border-top-color: transparent !important; }
-        #puzzle-board { display: grid; gap: 0; position: relative; border: 1px solid rgba(255, 255, 255, 0.2); background: #000; }
-        .victory-zoom { transform: scale(1.3); opacity: 0; z-index: 100; transition: 1.2s ease-in-out; }
-        #victory-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; z-index: 50; pointer-events: none; transition: opacity 0.3s; }
+        #puzzle-board { display: grid; gap: 0; position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.2); background: #000; }
+        .victory-zoom { transform: scale(1.3);
+            opacity: 0; z-index: 100; transition: 1.2s ease-in-out; }
+        #victory-overlay { position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; z-index: 50; pointer-events: none; transition: opacity 0.3s;
+        }
         .victory-zoom #victory-overlay { opacity: 1; }
 
-        .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: #333; color: white; font-weight: bold; transition: 0.2s; }
+        .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;
+            background: #333; color: white; font-weight: bold; transition: 0.2s; }
         .btn:active { transform: scale(0.95); }
-        #rank-btn { background: rgba(241, 196, 15, 0.15); color: var(--gold); border: 1px solid var(--gold); }
+        #rank-btn { background: rgba(241, 196, 15, 0.15); color: var(--gold);
+            border: 1px solid var(--gold); }
     </style>
 </head>
 <body>
@@ -115,7 +140,8 @@
             <h2>欢迎来到拼图大师</h2>
             <p style="opacity: 0.6; font-size: 0.9rem;">设置昵称以开启全球排行榜</p>
             <input type="text" id="nickname-input" placeholder="输入您的昵称..." maxlength="8">
-            <button class="btn" style="width: 100%; background: var(--primary-color);" onclick="registerUser()">开始游戏</button>
+            <button class="btn" style="width: 100%; background: var(--primary-color);"
+            onclick="registerUser()">开始游戏</button>
         </div>
     </div>
 
@@ -124,7 +150,8 @@
         <p style="font-size: 0.8rem; opacity: 0.5; margin-bottom: 20px;">实时更新 · 前 1000 名</p>
         <div class="rank-container" id="rank-list"></div>
         <div class="my-rank-info" id="my-rank-text">正在计算排名...</div>
-        <button class="btn" style="margin-top: 20px; width: 200px;" onclick="closeRank()">返回</button>
+        <button class="btn" style="margin-top: 20px; width: 200px;"
+        onclick="closeRank()">返回</button>
     </div>
 
     <div id="user-bar">
@@ -155,12 +182,12 @@
     </div>
 
     <script>
-        const FORMATS = ['.jpg', '.png', '.webp', '.jpeg'];
+        // 【优化】移除了 FORMATS 数组，因为现在统一为 .webp
         let levelData = [], completedLevels = JSON.parse(localStorage.getItem('puz_comp_v31') || '[]');
         let currentImgUrl = '', currentLevelId = 1, rows, cols, pWidth, pHeight;
         let pieces = [], isVictoryProcessing = false;
 
-        // --- 数据架构：支持实时更新的模拟后端 ---
+        // --- 数据架构 ---
         const DataService = {
             async getUser() {
                 const id = localStorage.getItem('puz_user_id'), nick = localStorage.getItem('puz_nickname');
@@ -173,7 +200,6 @@
                 return { id, nick };
             },
             async getRankings() {
-                // 模拟的其他玩家数据
                 const others = [
                     { nick: "拼图战神", level: 88 },
                     { nick: "逻辑狂魔", level: 75 },
@@ -182,12 +208,9 @@
                     { nick: "萌新小黑", level: 12 },
                     { nick: "正在努力", level: 8 }
                 ];
-                
-                // 核心修复：实时从本地存储获取“我”的最高进度
                 const myNick = localStorage.getItem('puz_nickname') || "我";
                 const myComp = JSON.parse(localStorage.getItem('puz_comp_v31') || '[]');
                 const myLevel = myComp.length > 0 ? Math.max(...myComp) : 0;
-
                 const fullList = [...others, { nick: myNick, level: myLevel, isMe: true }];
                 return fullList.sort((a,b) => b.level - a.level);
             }
@@ -254,26 +277,32 @@
             const currentMax = completedLevels.length > 0 ? Math.max(...completedLevels) : 0;
             const targetLimit = currentMax + 5; 
             let count = levelData.length;
+            
             while (count < targetLimit) {
                 const nextId = count + 1;
-                const foundUrl = await findImageForLevel(nextId);
-                if (foundUrl) { levelData.push({ id: nextId, url: foundUrl }); count++; } 
-                else break;
+                // 【优化】直接指定 webp 格式，移除之前的循环探测逻辑
+                const url = `${nextId}.webp`;
+                
+                // 仍然需要 probeImage 检查文件是否存在（以确定是否到达了关卡末尾）
+                if (await probeImage(url)) { 
+                    levelData.push({ id: nextId, url: url }); 
+                    count++;
+                } else {
+                    // 如果 n.webp 不存在，说明已经加载完所有设计好的关卡
+                    break;
+                }
             }
             renderMenu();
         }
 
-        async function findImageForLevel(id) {
-            for (const ext of FORMATS) {
-                const url = `${id}${ext}`;
-                if (await probeImage(url)) return url;
-            }
-            return null;
-        }
+        // 【优化】移除 findImageForLevel 函数，因为不再需要测试多种后缀
 
         function probeImage(url) {
             return new Promise(resolve => {
-                const img = new Image(); img.onload = () => resolve(true); img.onerror = () => resolve(false); img.src = url;
+                const img = new Image(); 
+                img.onload = () => resolve(true); 
+                img.onerror = () => resolve(false); 
+                img.src = url;
             });
         }
 
@@ -313,7 +342,8 @@
         }
 
         function startLevel(levelId) {
-            isVictoryProcessing = false; currentLevelId = levelId;
+            isVictoryProcessing = false;
+            currentLevelId = levelId;
             const levelInfo = levelData.find(l => l.id === levelId);
             if (!levelInfo) return;
 
@@ -395,11 +425,13 @@
                 });
             };
             window.onpointerup = (ev) => {
-                window.onpointermove = null; window.onpointerup = null;
+                window.onpointermove = null;
+                window.onpointerup = null;
                 const dx = ev.clientX - startX, dy = ev.clientY - startY;
                 let dCols = Math.round(dx / pWidth), dRows = Math.round(dy / pHeight);
                 if (dCols !== 0 || dRows !== 0) {
-                    let illegal = false; const plan = [];
+                    let illegal = false;
+                    const plan = [];
                     for (let gid of activeGroupId) {
                         const p = pieces.find(x => x.id === gid);
                         const nr = Math.floor(p.currentPos / cols) + dRows, nc = (p.currentPos % cols) + dCols;
@@ -410,7 +442,8 @@
                         const targets = plan.map(m => m.to), originals = plan.map(m => m.from);
                         const victims = pieces.filter(x => targets.includes(x.currentPos) && !activeGroupId.includes(x.id));
                         const vacant = originals.filter(v => !targets.includes(v));
-                        plan.forEach(m => m.p.currentPos = m.to); victims.forEach((v, i) => v.currentPos = vacant[i]);
+                        plan.forEach(m => m.p.currentPos = m.to);
+                        victims.forEach((v, i) => v.currentPos = vacant[i]);
                     }
                 }
                 activeGroupId.forEach(gid => { const el = document.querySelector(`[data-id="${gid}"]`); if(el) { el.style.zIndex = "1"; el.style.transform = ""; } });
@@ -435,21 +468,14 @@
             return Array.from(group);
         }
 
-        // --- 核心修复：通关后的数据连动逻辑 ---
         function checkWin() {
             if (pieces.every(p => p.id === p.currentPos)) {
                 isVictoryProcessing = true;
-                
-                // 1. 立即更新内存中的完成数据
                 if (!completedLevels.includes(currentLevelId)) {
                     completedLevels.push(currentLevelId);
                     localStorage.setItem('puz_comp_v31', JSON.stringify(completedLevels));
                 }
-
-                // 2. 刷新顶部 UI (进度条/等级文本)
                 updateUserUI(localStorage.getItem('puz_nickname'));
-
-                // 3. 播放胜利动画并进入下一关
                 document.getElementById('board-container').classList.add('victory-zoom');
                 setTimeout(() => { 
                     discoverLevels(); 
@@ -459,7 +485,7 @@
         }
 
         function showMenu() { 
-            document.getElementById('game-screen').classList.remove('active'); 
+            document.getElementById('game-screen').classList.remove('active');
             document.getElementById('menu-screen').classList.add('active'); 
             renderMenu(); 
         }
